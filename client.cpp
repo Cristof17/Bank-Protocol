@@ -16,28 +16,24 @@ using namespace std;
 #define BUFLEN 255
 
 
+/*
+ * Responses
+ */
 #define SUCCESS 100000
 #define LOGIN_BRUTE_FORCE -8
 #define ALREADY_LOGGED_IN -2
 #define NOT_LOGGED_IN -10
-#define INEXISTENT_FILE -4
-#define ALREADY_SHARED -6
-#define SHARED_SUCCESSFUL 200
-#define UNSHARED_SUCCESSFUL 201
-#define DELETE_SUCCESSFUL 202
-#define ALREADY_PRIVATE -7
-
 
 #define QUIT_CMD 10
 #define DEFAULT_CMD 1
 #define UPLOAD_CMD 2
+#define CARD_NO_INEXISTENT -4
+#define WRONG_PIN -3
+#define UNLOCK_ERROR 101
+#define UNLOCK_SUCCESSFUL 102
 
 #define LOGOUT_INVALID_USER -1
 #define LOGOUT_SUCCESSFUL 1001
-#define GETUSERLIST_SUCCESSFUL 1002
-#define GETUSERLIST_EMPTY 1003
-#define GETFILELIST_SUCCESSFUL 1004
-#define GETFILELIST_FAIL 1005
 #define UNKNOWN_USER -11
 
 /*
@@ -253,8 +249,6 @@ int main(int argc, char ** argv)
 						/*
 						 * Get username from server for prompt
 						 */
-						memset(prompt, 0 , BUFLEN);
-						recv(sockfd, prompt, BUFLEN, 0);
 						char message[] = "Login successful\n";
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
@@ -273,7 +267,6 @@ int main(int argc, char ** argv)
 						char message[] = "-2 Sesiune deja deschisa\n";
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
-						recv(sockfd, prompt, BUFLEN, 0);
 						break;
 					}
 					case LOGOUT_INVALID_USER:
@@ -286,63 +279,6 @@ int main(int argc, char ** argv)
 					}
 					case LOGOUT_SUCCESSFUL:
 					{
-						memset(prompt, 0, BUFLEN);
-						memset(buffer, 0, BUFLEN);
-						break;
-					}
-					case GETUSERLIST_SUCCESSFUL:
-					{
-						int N; //number of users
-						/*
-						 * Get the number of users
-						 */
-						memset(buffer, 0, BUFLEN);	
-						recv(i, buffer, BUFLEN, 0);
-						N = atoi(buffer);
-						/*
-						 * Receive the name of each user
-						 */ 
-						for (int j = 0; j < N; ++j) {
-							recv(i, buffer, BUFLEN, 0);
-							printf("%s\n",buffer);
-							write_log(buffer);
-							memset(buffer, 0, BUFLEN);
-						}
-						break;
-					}
-					case GETUSERLIST_EMPTY:
-					{
-						char message[] = "-1 Cientul nu e autentificat\n";
-						printf("%s", message);
-						write_log(message);
-						break;
-					}
-					case GETFILELIST_SUCCESSFUL:
-					{
-						int N = 0;
-						/*
-						 * Receive the count
-						 */
-						 memset(buffer, 0, BUFLEN);
-						 recv(i, buffer, BUFLEN, 0);
-						 N = atoi(buffer);
-						 printf("Received message %s\n", buffer);
-						 /*
-						  * For each file receive a line
-						  * containing all the infos
-						  */
-						for (int j = 0; j < N; ++j) {
-							memset(buffer, 0, BUFLEN);
-							recv(i, buffer, BUFLEN, 0);
-							printf("%s\n", buffer);
-							write_log(buffer);
-						}
-						memset(buffer, 0, BUFLEN);
-						break;
-					}
-					case GETFILELIST_FAIL:
-					{
-						printf("User has no files\n");
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
@@ -354,65 +290,17 @@ int main(int argc, char ** argv)
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
-					case UNKNOWN_USER:
+					case CARD_NO_INEXISTENT:
 					{
-						printf("-11 Utilizator inexistent\n");
-						memset(buffer, 0, BUFLEN);
-						break;
-					}
-					case ALREADY_SHARED:
-					{
-						char message[BUFLEN];
-						memset(message, 0, BUFLEN);
-						printf("-6 Fisierul este deja partajat\n");
-						write_log(message);
-						memset(buffer, 0, BUFLEN);
-						break;
-					}
-					case SHARED_SUCCESSFUL:
-					{
-						char message[BUFLEN];
-						memset(message, 0, BUFLEN);
-						recv(i, message, BUFLEN, 0);
+						char message[] = "ATM> -4 : Numar card inexistent";
 						printf("%s\n", message);
 						write_log(message);
-						memset(buffer,0 , BUFLEN);
-						break;
-					}
-					case INEXISTENT_FILE:
-					{
-						char message[BUFLEN];
-						memset(message, 0, BUFLEN);
-						sprintf(message,"-4 Fisier inexistent");
-						printf("-4 Fisier inexistent\n");
-						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
-					case UNSHARED_SUCCESSFUL:
+					case WRONG_PIN:
 					{
-						char message[BUFLEN];
-						memset(message, 0, BUFLEN);
-						recv(i, message, BUFLEN, 0);
-						printf("%s\n", message);
-						write_log(message);
-						memset(buffer,0 , BUFLEN);
-						break;
-					}
-					case ALREADY_PRIVATE:
-					{
-						char message[BUFLEN];
-						memset(message, 0, BUFLEN);
-						printf("-7 Fisier deja privat\n");
-						write_log(message);
-						memset(buffer, 0, BUFLEN);
-						break;
-					}
-					case DELETE_SUCCESSFUL:
-					{
-						char message[BUFLEN];
-						memset(message, 0, BUFLEN);
-						recv(i, message, BUFLEN, 0);
+						char message[] = "ATM> -3 : Pin gresit";
 						printf("%s\n", message);
 						write_log(message);
 						memset(buffer, 0, BUFLEN);

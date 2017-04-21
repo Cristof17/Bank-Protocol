@@ -32,27 +32,15 @@
  * Responses
  */
 #define SUCCESS 100000
-#define USER_OR_PASS_WRONG -3
 #define ALREADY_LOGGED_IN -2
-#define INEXISTENT_FILE -4
-#define ALREADY_SHARED -6
-#define SHARED_SUCCESSFUL 200
-#define UNSHARED_SUCCESSFUL 201
-#define ALREADY_PRIVATE -7
-#define DELETE_SUCCESSFUL 202
-#define CARD_NO_INEXISTENT 10021
-#define WRONG_PIN 10023
+#define CARD_NO_INEXISTENT -4
+#define WRONG_PIN -3
 
 #define NOT_LOGGED_IN -10
 #define LOGOUT_INVALID_USER -1
-#define UNKNOWN_USER -11
 #define LOGOUT_SUCCESSFUL 1001
-#define GETUSERLIST_SUCCESSFUL 1002
-#define GETUSERLIST_EMPTY 1003
-#define GETFILELIST_SUCCESSFUL 1004
-#define GETFILELIST_FAIL 1005
-#define UNBLOCK_ERROR 101
-#define UNBLOCK_SUCCESSFUL 102
+#define UNLOCK_ERROR 101
+#define UNLOCK_SUCCESSFUL 102
 
 /*
  * Globals
@@ -142,11 +130,11 @@ void block_card(login_params *params){
 }
 
 //to unblock a card you just need to set the value to -1 for a given cardno
-int unblock(long card_no, int pin){
+int unlock(long card_no, int pin){
 	int i = 0;
 	int j = 0;
 	if (blocked_cards == NULL)
-		return UNBLOCK_ERROR;
+		return UNLOCK_ERROR;
 	for (i = 0; i < blocked_cards_no; ++i){
 		//check if the card is blocked
 		if (blocked_cards[i] == card_no){
@@ -158,12 +146,12 @@ int unblock(long card_no, int pin){
 					users[j]->pin == pin){
 					blocked_cards[i] = -1;
 					printf("Unblocking card\n");
-					return UNBLOCK_SUCCESSFUL;		
+					return UNLOCK_SUCCESSFUL;		
 				}
 			}
 		}
 	}
-	return UNBLOCK_ERROR;
+	return UNLOCK_ERROR;
 }
 
 int get_command_code(char *command)
