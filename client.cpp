@@ -155,9 +155,7 @@ int main(int argc, char ** argv)
 		perror("Cannot create file");
 
 	char buffer[BUFLEN];
-	char prompt[BUFLEN];
 	memset(buffer, 0 , sizeof(buffer));
-	memset(prompt, 0 , sizeof(prompt));
 
 	/*
 	 * Do what select is meant to do
@@ -170,10 +168,8 @@ int main(int argc, char ** argv)
 	while(1) {
 
 		modified = original;
-		fputs(prompt, stdout);
 		fputs(">", stdout);
 		fflush(stdout);
-		//fgets(buffer, BUFLEN, stdin);
 		/*
 		 * Listen for commands
 		 */
