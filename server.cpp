@@ -52,6 +52,8 @@
 #define GETUSERLIST_EMPTY 1003
 #define GETFILELIST_SUCCESSFUL 1004
 #define GETFILELIST_FAIL 1005
+#define UNBLOCK_ERROR 101
+#define UNBLOCK_SUCCESSFUL 102
 
 /*
  * Globals
@@ -68,8 +70,8 @@
 using namespace std;
 
 typedef struct login_params {
-	char username[BUFLEN];
-	char password[BUFLEN];
+	long card_no;
+	int pin;
 } login_params_t;
 
 typedef struct file {
@@ -81,7 +83,12 @@ typedef struct file {
 typedef struct user{
 	int fd;
 	int files_no;
-	char *username;
+	char *name;
+	char *surname;
+	long card_no;
+	int pin;
+	char *password;
+	float balance;
 	file_t **files;
 } user_t;
 
@@ -123,6 +130,41 @@ user_t **users;
  */
 user_t **users_unique;
 
+long *blocked_cards;
+int blocked_cards_no;
+
+//put the card_no in the array of blocked cards
+void block_card(login_params &params){
+	if (blocked_cards == NULL)
+		blocked_cards = (long *)calloc(200 * sizeof(long));
+	blocked_cards[blocked_cards_no] = params->card_no;
+}
+
+//to unblock a card you just need to set the value to -1 for a given cardno
+int unblock(long card_no, int pin){
+	int i = 0;
+	int j = 0;
+	if (blocked_cards == NULL)
+		return UNBLOCK_ERROR;
+	for (i = 0; i < blocked_cards_no; ++i){
+		//check if the card is blocked
+		if (blocked_cards[i] == card_no){
+			//iterate through the users to check
+			//if the pin is ok for the given card	
+			//curr holds the number of users
+			for (j = 0; j < curr; ++j){
+				if (users[j]->card_no == card_no &&
+					users[j]->pin == pin){
+					blocked_cards[i] = -1;
+					printf("Unblocking card\n");
+					return UNBLOCK_SUCCESSFUL;		
+				}
+			}
+		}
+	}
+	return UNBLOCK_ERROR;
+}
+
 int get_command_code(char *command)
 {
 	if (strcmp(command, "login") == 0)
@@ -151,8 +193,12 @@ int login(login_params_t *params)
 {
 	int N; //lines in user_file
 	char line[BUFLEN];
-	char user[BUFLEN];//read user from file
+	char name[BUFLEN];//read name from file
+	char surname[BUFLEN]; //read surname from file
 	char pass[BUFLEN];//read pass from file
+	long card_no = 0;
+	int pin = 0;
+	float sold = 0;
 	memset(user, 0, BUFLEN);
 	memset(pass, 0, BUFLEN);
 
@@ -161,10 +207,9 @@ int login(login_params_t *params)
 	fscanf(user_file, "%d", &N);
 	for (int i = 0; i < N; ++i) {
 		fgets(line, BUFLEN, user_file);
-		fscanf(user_file, "%s %s", user, pass);
-		printf("user = %s pass = %s\n", user, pass);
-		if (strcmp(user, params->username) == 0
-		 && strcmp(pass, params->password) == 0) {
+		fscanf(user_file, "%s %s %ld %d %f", user, surname, &card_no, &pin, &balance);
+		if ((params->card_no == card_no) 
+		 && (params->pin == pin)) {
 			fseek(user_file, 0, SEEK_SET);
 		 	return SUCCESS;
 		 }
@@ -223,8 +268,6 @@ void get_users_from_file(user_t **out)
 {
 	int N = 0;
 	int curr = 0;
-	char dummy_pass[BUFLEN];
-	memset(dummy_pass, 0, BUFLEN);
 	/*
 	 * Position cursor at the beginning of the file
 	 * (Others calls might have moved the cursor)
@@ -241,9 +284,18 @@ void get_users_from_file(user_t **out)
 	 */
 	 for (int i = 0; i < N; ++i) {
 		out[curr] = (user_t *)malloc(1 * sizeof(user_t));
-		out[curr]->username = (char *) malloc(BUFLEN * sizeof(char));
-		fscanf(user_file, "%s %s", out[curr]->username, dummy_pass);
-		printf("Username got is %s\n", out[curr]->username);
+		out[curr]->name = (char *) malloc(BUFLEN * sizeof(char));
+		fscanf(user_file, "%s %s %ld %i %s %f", out[curr]->name, out[curr]->surname,
+											out[curr]->card_no, out[curr]->pin, out[curr]->password,
+											out[curr]->balance);
+		printf("Entering user with %s %s %ld %d %s %f\n", 
+			out[curr]->name,
+			out[curr]->surname,
+			out[curr]->card_no,
+			out[curr]->pin,
+			out[curr]->password,
+			out[curr]->balance
+		);
 		curr++;
 	 }
 	 printf("Finished reading users from file \n");
@@ -320,22 +372,11 @@ int get_users_from_file_count()
 	return N;
 }
 
-void create_user_directories()
+void create_users()
 {
 	int N = get_users_from_file_count();
 	user_t **users = (user_t **)malloc(N * sizeof(user_t*));
 	get_users_from_file(users);
-	for (int i = 0; i < N; ++i) {
-		mkdir(users[i]->username, 0777);
-		if (errno == EEXIST){
-			printf("Directory %s already exists\n", users[i]->username);
-			continue;
-		}
-		if (errno == EACCES){
-			printf("You do not have access to create %s\n", users[i]->username);
-			continue;
-		}
-	}
 }
 
 int get_file_size(char *folder, char *file)
@@ -653,7 +694,7 @@ int main(int argc, char ** argv)
 	/*
 	 * Create user files
 	 */
-	create_user_directories();	
+	create_users();	
 
 	/*
 	 * Open socket
@@ -795,9 +836,15 @@ int main(int argc, char ** argv)
 								login_params_t params;
 								memset(&params, 0, sizeof(login_params_t));
 								char *tok = strtok(NULL, " \n");
-								memcpy(params.username, tok, strlen(tok));
-								tok = strtok(NULL, " \n");
-								memcpy(params.password, tok, strlen(tok));
+								if (tok != NULL){
+									long card_no = atol(tok);
+									params.card_no = card_no;
+									tok = strtok(NULL, " \n"):
+									if (tok != NULL){
+										int pin = atoi(tok);
+										params.pin = pin;
+									}
+								}
 								result = login(&params);
 								switch (result) {
 									case SUCCESS:
@@ -840,8 +887,9 @@ int main(int argc, char ** argv)
 
 									case LOGIN_BRUTE_FORCE:
 									{
-										printf("-8 Brute force detectat\n");
-										send_client_code(i, -8);
+										printf("%d Brute force detectat\n", LOGIN_BRUTE_FORCE);
+										send_client_code(i, LOGIN_BRUTE_FORCE);
+										block_card(&params);
 										break;
 									}
 									default:
