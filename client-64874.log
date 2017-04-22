@@ -1,0 +1,9 @@
+login 45452 12411
+ATM> -4 : Numar card inexistentlogin 456123 8799
+Login successful
+login 456123c
+-2 Sesiune deja deschisa
+login 456123
+-2 Sesiune deja deschisa
+login 45612321
+ATM> -4 : Numar card inexistent

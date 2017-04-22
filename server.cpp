@@ -182,22 +182,23 @@ int login(login_params_t *params, int *pos)
 	int status = CARD_NO_INEXISTENT;
 	for (i = 0; i < user_count; ++i){
 		if (users[i]->card_no == params->card_no){
-			if (users[i]->pin == params->pin){
-				users[i]->logged_in = LOGGED_IN;	
-				users[i]->login_attempts = 0;
-				if (users[i]->logged_in == LOGGED_IN){
-					status = ALREADY_LOGGED_IN;
-				} else {
+			if (users[i]->logged_in == LOGGED_IN){
+				status = ALREADY_LOGGED_IN;
+			} else {
+				if (users[i]->pin == params->pin){
+					users[i]->logged_in = LOGGED_IN;	
+					users[i]->login_attempts = 0;
 					status = SUCCESS;
 					*pos = i;
-				}
-			} else {
-				if (users[i]->login_attempts >= 3) {
-					status = LOGIN_BRUTE_FORCE;
-				}
-				else {
-					users[i]->login_attempts++;
-					status = WRONG_PIN;
+					printf("Scanning user %s %s\n", users[i]->name, users[i]->surname);
+				} else {
+					if (users[i]->login_attempts >= 3) {
+						status = LOGIN_BRUTE_FORCE;
+					}
+					else {
+						users[i]->login_attempts++;
+						status = WRONG_PIN;
+					}
 				}
 			}
 		}
@@ -211,22 +212,26 @@ int logout(int user_connection)
 	 * If the user has not been authenticated
 	 * it means he does not exist in the users list
 	 */
-	if (users[user_connection] == NULL)
+	user_t *user = NULL;
+	int i = 0;
+	for (i = 0; i < user_count; ++i){
+		if (users[i] != NULL){
+			if (users[i]->fd == user_connection)
+				user = users[i];
+		}
+	}
+	printf("user name = %s and logged_in = %d\n", user->name, user->logged_in);
+	if (user == NULL)
 		return LOGOUT_INVALID_USER;
-	user_t *user = users[user_connection];
+	if (user->logged_in == LOGGED_OUT){
+		return LOGOUT_INVALID_USER;
+	}
 	/*
 	 * The user exists and we must log him out
 	 * which means deleting the reference;
 	 */
-	free(user->name);
-	user->name = NULL;
-	free(user->surname);
-	user->surname = NULL;
-	free(user->password);
-	user->password = NULL;
-	 free(user);
-	 user = NULL;
-	 users[user_connection] = NULL;
+	user->logged_in = LOGGED_OUT;
+	user->login_attempts = 0;
 	 return LOGOUT_SUCCESSFUL;
 }
 void send_client_code(int fd, int code)
@@ -252,6 +257,8 @@ void send_client_message(int fd, char *message)
 void get_users_from_file(user_t **out)
 {
 	int N = 0;
+	char line[BUFLEN];
+	char *tok;
 	/*
 	 * Position cursor at the beginning of the file
 	 * (Others calls might have moved the cursor)
@@ -261,17 +268,38 @@ void get_users_from_file(user_t **out)
 	 * Get the number of users allowed and
 	 * alloc an array of size <number_of_users>
 	 */
-	fscanf(user_file, "%d", &N);
+	fscanf(user_file, "%d\n", &N);
 	printf("read N = %d\n", N);
 	/*
 	 * Read the users. (just the first word of each row)
 	 */
 	 for (int i = 0; i < N; ++i) {
+		fgets(line, BUFLEN, user_file);
 		out[user_count] = (user_t *)malloc(1 * sizeof(user_t));
-		out[user_count]->name = (char *) malloc(BUFLEN * sizeof(char));
-		fscanf(user_file, "%s %s %ld %i %s %f", out[user_count]->name, out[user_count]->surname,
-											out[user_count]->card_no, out[user_count]->pin, out[user_count]->password,
-											out[user_count]->balance);
+		out[user_count]->name = (char *)malloc(BUFLEN * sizeof(char));
+		out[user_count]->surname = (char *)malloc(BUFLEN * sizeof(char));
+		out[user_count]->password = (char *)malloc(BUFLEN * sizeof(char));
+		//process the current line 
+		//get the name
+		tok = strtok(line, "\n\t ");
+		strcpy(out[user_count]->name, tok);	
+		//get the surname
+		tok = strtok(NULL, "\n\t ");
+		strcpy(out[user_count]->surname, tok);
+		//get the card_no
+		tok = strtok(NULL, "\n\t ");
+		out[user_count]->card_no = atol(tok);
+		//get the pin
+		tok = strtok(NULL, "\n\t ");
+		out[user_count]->pin = atoi(tok);
+		//get the password
+		tok = strtok(NULL, "\n\t ");
+		strcpy(out[user_count]->password, tok);
+		//get the balance
+		tok = strtok(NULL, "\n\t ");
+		out[user_count]->balance = atof(tok);
+		
+
 		printf("Entering user with %s %s %ld %d %s %f\n", 
 			out[user_count]->name,
 			out[user_count]->surname,
@@ -297,7 +325,7 @@ int get_users_from_file_count()
 void create_users()
 {
 	int N = get_users_from_file_count();
-	user_t **users = (user_t **)malloc(N * sizeof(user_t*));
+	users = (user_t **)malloc(N * sizeof(user_t*));
 	get_users_from_file(users);
 }
 
@@ -318,8 +346,8 @@ user_t *get_user_by_name(char *name)
 
 int main(int argc, char ** argv)
 {
-	if (argc <= 3){
-		perror("./server <port> <user_file> <shared_file>");
+	if (argc <= 2){
+		perror("./server <port> <user_file>");
 		exit(1);
 	}
 	
@@ -475,16 +503,19 @@ int main(int argc, char ** argv)
 							{
 								login_params_t params;
 								memset(&params, 0, sizeof(login_params_t));
-								char *tok = strtok(NULL, " \n");
+								char *tok = strtok(NULL, " \t\n");
+								printf("Tok = %s\n", tok);
 								if (tok != NULL){
 									long card_no = atol(tok);
 									params.card_no = card_no;
-									tok = strtok(NULL, " \n");
+									tok = strtok(NULL, " \t\n");
+									printf("Tok = %s\n", tok);
 									if (tok != NULL){
 										int pin = atoi(tok);
 										params.pin = pin;
 									}
 								}
+								printf("Login params = %ld %d\n", params.card_no, params.pin);
 								result = login(&params, &user_fd);
 								switch (result) {
 									case SUCCESS:
@@ -516,6 +547,8 @@ int main(int argc, char ** argv)
 										break;
 									}
 									default:
+										printf("%d -4 Card no not existent\n", CARD_NO_INEXISTENT);
+										send_client_code(i, CARD_NO_INEXISTENT);
 										break;
 								}
 								break;
@@ -530,7 +563,7 @@ int main(int argc, char ** argv)
 									case LOGOUT_INVALID_USER:
 									{
 										printf("-1 Clientul nu este autentificat");
-										send_client_code(i, -1);
+										send_client_code(i, LOGOUT_INVALID_USER);
 										break;
 									}
 									case LOGOUT_SUCCESSFUL:
@@ -546,6 +579,8 @@ int main(int argc, char ** argv)
 							}
 							default:
 							{
+								printf("%d Default command\n", DEFAULT_CMD);
+								send_client_code(i, DEFAULT_CMD);
 								break;
 							}
 						} //endswitch code

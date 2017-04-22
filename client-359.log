@@ -1,0 +1,20 @@
+login 456123 8799
+ATM> Login successful
+logout
+lg
+lo
+logout
+ATM> -1 : Clientul nu e autentificat
+lgou
+logout
+ATM> -1 : Clientul nu e autentificat
+logou
+login 456123 8799
+ATM> Login successful
+logout
+lg
+lgo
+logout
+ATM> -1 : Clientul nu e autentificat
+exir
+eixt

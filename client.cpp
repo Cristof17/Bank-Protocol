@@ -249,30 +249,30 @@ int main(int argc, char ** argv)
 						/*
 						 * Get username from server for prompt
 						 */
-						char message[] = "Login successful\n";
+						char message[] = "ATM> Login successful\n";
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LOGIN_BRUTE_FORCE:
 					{
-						printf("-8 Brute force detectat\n");
-						char message[] = "-8 Brute force detectat\n";
+						printf("ATM> -8 : Brute force detectat\n");
+						char message[] = "ATM> -8 : Brute force detectat\n";
 						write_log(message);
 						break;
 					}
 					case ALREADY_LOGGED_IN:
 					{
-						printf("-2 Sesiune deja deschisa\n");
-						char message[] = "-2 Sesiune deja deschisa\n";
+						printf("ATM> -2 : Sesiune deja deschisa\n");
+						char message[] = "ATM> -2 : Sesiune deja deschisa\n";
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LOGOUT_INVALID_USER:
 					{
-						printf("-1 Clientul nu e autentificat\n");
-						char message[] = "-1 Clientul nu e autentificat\n";
+						printf("ATM> -1 : Clientul nu e autentificat\n");
+						char message[] = "ATM> -1 : Clientul nu e autentificat\n";
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;
@@ -284,7 +284,7 @@ int main(int argc, char ** argv)
 					}
 					case NOT_LOGGED_IN:
 					{
-						char message[] = "-11 Utilizator inexistent";
+						char message[] = "ATM> -11 : Utilizator inexistent";
 						printf("%s\n", message);
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
@@ -308,6 +308,8 @@ int main(int argc, char ** argv)
 					}
 					case DEFAULT_CMD:
 					{
+						printf("Command not recognized\n");
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					default:

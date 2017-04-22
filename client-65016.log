@@ -1,0 +1,12 @@
+login 456123 8799
+ATM> Login successful
+logout
+login 456123 8799
+ATM> Login successful
+login 456123 8799
+ATM> -2 : Sesiune deja deschisa
+log
+logout
+logout
+l
+logout
