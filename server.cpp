@@ -20,7 +20,7 @@
  */
 #define LOGIN_CMD 10
 #define DEFAULT_CMD 1
-#define LOGIN_BRUTE_FORCE 2
+#define LOGIN_BRUTE_FORCE -8
 #define QUIT_CMD 3
 #define LOGOUT_CMD 4
 #define LISTSOLD_CMD 5
@@ -82,9 +82,11 @@ typedef struct user{
 	int logged_in;
 } user_t;
 
-int server_sock;
+int server_sock; //TCP Socket
+int unlock_sock ; //UDP Socket
 int client_sock;
-struct sockaddr_in server_addr;
+struct sockaddr_in server_addr_tcp;
+struct sockaddr_in server_addr_udp;
 struct sockaddr_in client_addr;
 
 /*
@@ -367,32 +369,61 @@ int main(int argc, char ** argv)
 	create_users();	
 
 	/*
-	 * Open socket
+	 * Open TCP socket
 	 */
 	server_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_sock == 0) {
 		perror("Cannot open first socket \n");
 		exit(1);
 	}
+	
+	/*
+	 * Open UDP Socket for unlock calls
+	 */
+	unlock_sock = socket(AF_INET,SOCK_DGRAM,0);
+	if (unlock_sock < 0){
+		perror("Cannot open UDP Socket");	
+		exit(1);
+	}
+		
 
 
 	/*
 	 * Setup the address and port for server to listen on
 	 */
-	 memset((char *) &server_addr, 0, sizeof(server_addr));
-	 server_addr.sin_family = AF_INET;
-	 server_addr.sin_addr.s_addr = INADDR_ANY;
-	 server_addr.sin_port = htons (atoi(argv[1]));
+	 memset((char *) &server_addr_tcp, 0, sizeof(server_addr_tcp));
+	 server_addr_tcp.sin_family = AF_INET;
+	 server_addr_tcp.sin_addr.s_addr = INADDR_ANY;
+	 server_addr_tcp.sin_port = htons (atoi(argv[1]));
+
+	/*
+	 * Setup the address and port for server to listen on
+	 */
+	 memset((char *) &server_addr_udp, 0, sizeof(server_addr_udp));
+	 server_addr_udp.sin_family = AF_INET;
+	 server_addr_udp.sin_addr.s_addr = INADDR_ANY;
+	 server_addr_udp.sin_port = htons (atoi(argv[1]));
 	
 	/*
-	 * Bind socket to address and  port
+	 * Bind TCP socket to address and  port
 	 */
 
-	result = bind(server_sock, (struct sockaddr *) &server_addr, sizeof(server_addr));
+	result = bind(server_sock, (struct sockaddr *) &server_addr_tcp, sizeof(server_addr_tcp));
 	if (result < 0) {
-		perror( "Cannot bind socket to address \n");
+		perror( "Cannot bind TCP socket to address \n");
 		exit(1);
 	}
+
+	/*
+	 * Bind UDP socket to address and port
+	 */
+	result = bind(unlock_sock, (struct sockaddr *) &server_addr_udp, sizeof(server_addr_udp));
+	if (result < 0){
+		perror("Cannot bind UDP Socket");
+		exit(1);
+	}
+
+
 	
 	/*
 	 * Call listen call
@@ -412,8 +443,11 @@ int main(int argc, char ** argv)
 
  	if(server_sock > fdmax)
 		fdmax = server_sock;
+	if (unlock_sock > fdmax)
+		fdmax = unlock_sock;
 	
-	FD_SET(fdmax, &original);
+	FD_SET(server_sock, &original);
+	FD_SET(unlock_sock, &original);
 	FD_SET(STDIN_FILENO, &original);
 
 
@@ -453,9 +487,9 @@ int main(int argc, char ** argv)
 						}
 					}
 					printf("Noua conexiune la server \n");
-				}
-
-				else if (i == STDIN_FILENO) {
+				} else if (i == unlock_sock){
+					//unlock logic
+				} else if (i == STDIN_FILENO) {
 					char buffer[BUFLEN];
 					memset(buffer, 0, BUFLEN);
 					fgets(buffer, BUFLEN, stdin);
@@ -594,5 +628,6 @@ int main(int argc, char ** argv)
 	 * Closing remarks
 	 */
 	close(server_sock);
+	close(unlock_sock);
 	return 0;	
 }

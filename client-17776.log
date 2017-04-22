@@ -1,0 +1,18 @@
+login 456123 8977
+ATM> -3 : Pin gresitlogin 456123 8799
+ATM> Login successful
+logout
+login 456123 8799
+ATM> Login successful
+logout
+logout
+ATM> -1 : Clientul nu e autentificat
+login 456123 1231
+ATM> -3 : Pin gresitlogin 456123 1241
+ATM> -3 : Pin gresitlogin 456123 5121
+ATM> -3 : Pin gresitlogin 456123 21415
+login 456123 4512
+logout
+ATM> -1 : Clientul nu e autentificat
+logout
+ATM> -1 : Clientul nu e autentificat

@@ -27,6 +27,7 @@ using namespace std;
 #define QUIT_CMD 10
 #define DEFAULT_CMD 1
 #define UPLOAD_CMD 2
+#define LOGIN_CMD 10
 #define CARD_NO_INEXISTENT -4
 #define WRONG_PIN -3
 #define UNLOCK_ERROR 101
@@ -40,14 +41,17 @@ using namespace std;
  * All about server socket
  */
 int sockfd;
+int unlock_fd;
 int client_file_fd;
-struct sockaddr_in server_addr;
+struct sockaddr_in server_addr_tcp;
+struct sockaddr_in server_addr_udp;
 
 /*
  * Variables for local purposes
  */
 int result;
 char buffer[BUFLEN];
+char credentials[BUFLEN];
 
 /*
  * For select call
@@ -70,6 +74,28 @@ int get_command_code(char *command)
 	if (strcmp (tok, "upload") == 0)
 		return UPLOAD_CMD;
 	return DEFAULT_CMD;
+}
+
+void get_login_credentials(char *command, char *out_card_no, char *out_pin){
+	char copy[BUFLEN];
+	char *tok;
+	memset(copy, 0, BUFLEN);
+	memcpy(copy, command, BUFLEN);
+	//that is the command name
+	tok = strtok(copy, "\t\n ");
+	//that is the first argument
+	tok = strtok(NULL, "\t\n ");
+	if (tok != NULL){
+		strcpy(out_card_no, tok);
+	} else {
+		return;
+	}
+	//that is the second argument
+	tok = strtok(NULL, "\n\t ");
+	if (tok != NULL){
+		strcpy(out_pin, tok);
+	}
+	return;
 }
 
 void get_argument(char *command, char **out){
@@ -121,18 +147,35 @@ int main(int argc, char ** argv)
 	}
 
 	/*
+	 * Socket open
+	 */
+	unlock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sockfd <= 0) {
+		perror ("Cannot open client socket");
+		exit(1);
+	}
+
+	/*
 	 * Setup the socket
 	 */
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = inet_addr(argv[1]);
-	server_addr.sin_port = htons(atoi(argv[2]));
+	server_addr_tcp.sin_family = AF_INET;
+	server_addr_tcp.sin_addr.s_addr = inet_addr(argv[1]);
+	server_addr_tcp.sin_port = htons(atoi(argv[2]));
+
+	/*
+	 * Setup the socket
+	 */
+	server_addr_udp.sin_family = AF_INET;
+	server_addr_udp.sin_addr.s_addr = inet_addr(argv[1]);
+	server_addr_udp.sin_port = htons(atoi(argv[2]));
+
 
 	/*
 	 * Connect to server
 	 */ 
 
-	int size = sizeof(server_addr);
-	result = connect(sockfd, (struct sockaddr *) &server_addr, size);
+	int size = sizeof(server_addr_tcp);
+	result = connect(sockfd, (struct sockaddr *) &server_addr_tcp, size);
 	if (result < 0) {
 		perror("Cannot connect to server ");
 		exit(1);
@@ -150,8 +193,8 @@ int main(int argc, char ** argv)
 	if (client_file == NULL)
 		perror("Cannot create file");
 
-	char buffer[BUFLEN];
 	memset(buffer, 0 , sizeof(buffer));
+	memset(credentials, 0, sizeof(credentials));
 
 	/*
 	 * Do what select is meant to do
@@ -216,6 +259,14 @@ int main(int argc, char ** argv)
 						continue;
 					}
 					fclose(file);
+				}
+				if (get_command_code(buffer) == LOGIN_CMD){
+					//get the credentials so that unlock
+					//would know what user is going to connect
+					char card_no[BUFLEN];
+					char pin[BUFLEN];
+					get_login_credentials(buffer, card_no, pin);
+					printf("Login credentials = %s %s\n", card_no, pin);
 				}
 				/*
 				 * Send the command to server
