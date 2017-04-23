@@ -44,6 +44,7 @@
 #define UNLOCK_INEXISTENT_CARD_NO -4
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
+#define UNLOCK_UNBLOCKED_CARD -6
 
 /*
  * Globals
@@ -136,6 +137,7 @@ void block_card(login_params *params){
 	if (blocked_cards == NULL)
 		blocked_cards = (long *)calloc(200,sizeof(long));
 	blocked_cards[blocked_cards_no] = params->card_no;
+	blocked_cards_no ++;
 }
 
 int check_unlock_card_no(char *card_no){
@@ -162,9 +164,16 @@ int get_fd_for_card_no(long card_no){
 }
 
 //to unblock a card you just need to set the value to -1 for a given cardno
-int unlock(long card_no, int pin){
+int unlock(long card_no, char *password){
 	int i = 0;
 	int j = 0;
+	char password_copy[BUFLEN];
+	char *password_tok;
+	memset(password_copy, 0, BUFLEN);
+	strcpy(password_copy, password);
+	if (password != NULL){
+		password_tok = strtok(password_copy, " \n\t");	
+	}
 	if (blocked_cards == NULL)
 		return UNLOCK_ERROR;
 	for (i = 0; i < blocked_cards_no; ++i){
@@ -175,11 +184,12 @@ int unlock(long card_no, int pin){
 			//curr holds the number of users
 			for (j = 0; j < user_count; ++j){
 				if (users[j]->card_no == card_no){
-					if (users[j]->pin == pin){
+					if (strcmp(users[j]->password, password_tok) == 0){
 						blocked_cards[i] = -1;
-						printf("Unblocking card\n");
+						printf("UNBLOCK_SUCCESSFUL\n");
 						return UNLOCK_SUCCESSFUL;
 					} else {
+						printf("UNBLOCK SUCCESSFUL\n");
 						return UNLOCK_WRONG_PIN;
 					}		
 				}
@@ -410,7 +420,7 @@ user_t *get_user_by_name(char *name)
 	return NULL;
 }
 
-void get_unlock_credentials(char *command, long *card_no, int *pin)
+void get_unlock_credentials(char *command, long *card_no, char *password)
 {
 	char copy[BUFLEN];
 	char *tok;
@@ -422,7 +432,16 @@ void get_unlock_credentials(char *command, long *card_no, int *pin)
 	}
 	tok = strtok(NULL, "\n ");
 	if (tok != NULL){	
-		*pin = atoi(tok);
+		strcpy(password, tok);
+	}
+}
+
+void set_fd_for_card_no(long card_no, int fd){
+	int i = 0;
+	for (i = 0; i < user_count; ++i){
+		if (users[i]->card_no == card_no){
+			users[i]->fd = fd;
+		}
 	}
 }
 
@@ -606,21 +625,34 @@ int main(int argc, char ** argv)
 								continue;
 							} 								//parse card_no and pin
 							long card_no = 0;
-							int pin = 0;
-							get_unlock_credentials(buffer, &card_no, &pin);
-							printf("Received unlock credentials %s \n", buffer);
-							result = unlock(card_no, pin);
+							char password[BUFLEN];
+							get_unlock_credentials(buffer, &card_no, password);
+							printf("Received unlock credentials %ld %s \n", card_no, password);
+							result = unlock(card_no, password);
 							switch(result) {
 								case UNLOCK_SUCCESSFUL:
 								{
+									send_udp_client_code((struct sockaddr*)&client_addr_udp, unlock_sock,
+																		UNLOCK_SUCCESSFUL);
+									printf("Sending unlock successful %d\n", UNLOCK_SUCCESSFUL);
 									break;
 								}
 								case UNLOCK_ERROR:
 								{
+									send_udp_client_code((struct sockaddr*)&client_addr_udp, unlock_sock,
+																	UNLOCK_ERROR);
+									printf("Sending unlock error %d\n", UNLOCK_ERROR);
 									break;
 								}
 								case UNLOCK_WRONG_PIN:
 								{
+									send_udp_client_code((struct sockaddr*)&client_addr_udp, unlock_sock,
+																UNLOCK_WRONG_PIN);
+									break;
+								}
+								default:
+								{
+									printf("UNLOCK default error code\n");
 									break;
 								}
 							}
@@ -628,7 +660,7 @@ int main(int argc, char ** argv)
 						} else {
 							//send -4 message
 							send_udp_client_code((struct sockaddr*)&client_addr_udp,
-												i, UNLOCK_INEXISTENT_CARD_NO);
+												unlock_sock, UNLOCK_INEXISTENT_CARD_NO);
 							printf("Am trimis pe UDP -5\n");
 						}
 						break;
@@ -680,16 +712,18 @@ int main(int argc, char ** argv)
 							case LOGIN_CMD:
 							{
 								login_params_t params;
+								long card_no;
+								int pin;
 								memset(&params, 0, sizeof(login_params_t));
 								char *tok = strtok(NULL, " \t\n");
 								printf("Tok = %s\n", tok);
 								if (tok != NULL){
-									long card_no = atol(tok);
+									card_no = atol(tok);
 									params.card_no = card_no;
 									tok = strtok(NULL, " \t\n");
 									printf("Tok = %s\n", tok);
 									if (tok != NULL){
-										int pin = atoi(tok);
+										pin = atoi(tok);
 										params.pin = pin;
 									}
 								}
@@ -699,8 +733,7 @@ int main(int argc, char ** argv)
 									case SUCCESS:
 									{	
 										send_client_code(i, SUCCESS); 
-										users[user_fd]->fd = i;
-										printf("New user->fd = %d\n", users[i]->fd);
+										set_fd_for_card_no(card_no, i);
 										break;
 									}
 

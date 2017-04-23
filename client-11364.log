@@ -1,0 +1,12 @@
+login 456123
+ATM> -3 : Pin gresitUNLOCK> Trimite parola secreta
+>UNLOCK> -6 : Operatie esuata
+01fg
+pwd
+login 456123 12431
+ATM> -3 : Pin gresitlogin 456123 23121
+ATM> -3 : Pin gresitlogin 456123 2313121
+ATM> -8 : Brute force detectat
+UNLOCK> Trimite parola secreta
+>UNLOCK> -6 : Operatie esuata
+01fg

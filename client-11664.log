@@ -1,0 +1,13 @@
+login 456123 1231
+ATM> -3 : Pin gresitlogin 456123 1231
+ATM> -3 : Pin gresitlogin 456123 2132
+ATM> -3 : Pin gresitlogin 456123 1231
+ATM> -8 : Brute force detectat
+login 456123 1231
+ATM> -8 : Brute force detectat
+UNLOCK> Trimite parola secreta
+>UNLOCK> -7 : Deblocare esuata
+7UNLOCK> Trimite parola secreta
+>UNLOCK> Client deblocat
+
+02

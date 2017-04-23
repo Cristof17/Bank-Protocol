@@ -36,6 +36,7 @@ using namespace std;
 #define UNLOCK_INEXISTENT_CARD_NO -4
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
+#define UNLOCK_UNBLOCKED_CARD -6
 
 
 #define LOGOUT_INVALID_USER -1
@@ -116,6 +117,10 @@ void get_login_credentials(char *command, char *out_card_no, char *out_pin){
 	return;
 }
 
+int get_unlock_response(char *message){
+	char copy[BUFLEN];
+}
+
 void get_argument(char *command, char **out){
 	if (*out == NULL)
 		(*out) = (char *)malloc(BUFLEN * sizeof(char));
@@ -140,6 +145,18 @@ bool check_buffer_empty(char *buffer)
 	if (tok == NULL)
 		return true;
 	return false;
+}
+
+void get_unlock_response_code(char *buffer, char *code){
+	char copy[BUFLEN];
+	char *tok;
+	memset(copy, 0, BUFLEN);
+	strcpy(copy, buffer);
+	/*
+	 * Get the first number that appears in the buffer
+	 */
+	tok = strtok(copy, " \n\t");	
+	strcpy(code, tok);
 }
 
 void write_log(char *buff)
@@ -186,7 +203,7 @@ int main(int argc, char ** argv)
 	 * Setup the socket
 	 */
 	memset(&server_addr_udp, 0, sizeof(server_addr_udp));
-	server_addr_udp.sin_family = PF_INET;
+	server_addr_udp.sin_family = AF_INET;
 	server_addr_udp.sin_addr.s_addr = inet_addr(argv[1]);
 	server_addr_udp.sin_port = htons(atoi(argv[2]));
 
@@ -249,7 +266,7 @@ int main(int argc, char ** argv)
 			/*
 			 * Ifock_sizeI need to read from stdin
 			 */
-			if (i == STDIN_FILENO) {
+			if (i == STDIN_FILENO && FD_ISSET(i, &modified)) {
 				read(STDIN_FILENO, buffer, BUFLEN);
 				if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
 					printf("Buffer is empty\n");
@@ -278,7 +295,96 @@ int main(int argc, char ** argv)
 					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
 					sendto(unlock_fd, buffer, BUFLEN, 0,
 						(struct sockaddr *)&server_addr_udp, sock_size); 
-					printf("sent unlock request with %s\n", buffer);
+					/*
+					 * get the response for the unlock command
+					 */
+					recvfrom(unlock_fd, buffer, BUFLEN, 0,
+							(struct sockaddr*)& receive_addr_udp, &sock_size); 
+					/*
+					 * the buffer should contain just a number
+					 */
+					char code[BUFLEN];
+					memset(code, 0, BUFLEN);
+					get_unlock_response_code(buffer, code);
+					switch (atoi(code)){
+						case UNLOCK_REQUEST_PIN:
+						{
+							/* 
+							 * Request pin
+							 */
+							char message[] = "UNLOCK> Trimite parola secreta\n>";
+							char pin[BUFLEN];
+							fputs(message, stdout);
+							write_log(message);
+							/*
+							 * Get pin from input
+							 */
+							memset(buffer, 0, BUFLEN);
+							strcat(buffer, card_no); 
+							strcat(buffer, " ");
+							/*
+							 * Replace \0 with a space 
+							 */
+							fgets(pin, BUFLEN, stdin);
+							/*
+							 * Append it to the credentials
+							 */
+							strcat(buffer, pin);
+							/*
+							 * Send pin to server
+							 */
+							sendto(unlock_fd, buffer, BUFLEN, 0,
+									(struct sockaddr *)&server_addr_udp,
+									sizeof(struct sockaddr));
+							/*
+							 * Wait to check if the pin is ok
+							 */
+							 memset(buffer, 0, BUFLEN);
+							 recvfrom(unlock_fd, buffer, BUFLEN, 0,
+							 		(struct sockaddr *)&receive_addr_udp,
+									&sock_size);
+							/*
+							 * Get the response code
+							 */ 
+							memset(code, 0, BUFLEN);
+							get_unlock_response_code(buffer, code);
+							switch(atoi (code)){
+								case UNLOCK_SUCCESSFUL:
+								{
+									
+									char message[] = "UNLOCK> Client deblocat\n";
+									write_log(message);
+									fputs(message, stdout);
+									break;
+								}
+								case UNLOCK_WRONG_PIN:
+								{
+									char message[] = "UNLOCK> -7 : Deblocare esuata";
+									write_log(message);
+									fputs(message, stdout);
+									break;
+								}
+								case UNLOCK_ERROR:
+								{
+									char message[] = "UNLOCK> -6 : Operatie esuata";
+									write_log(message);
+									fputs(message, stdout);
+									break;
+								}
+							}
+							break;
+						}
+						case UNLOCK_UNBLOCKED_CARD:
+						{
+							/*
+							 * Card is not blocked
+							 */
+							char message[] = "UNLOCK> -6 : Operatie esuata\n";
+							write_log(message);
+							fputs(message, stdout);
+							break;
+						}
+					}
 					continue;
 				}
 				/*
@@ -289,18 +395,21 @@ int main(int argc, char ** argv)
 				 * Log the command
 				 */
 				write_log(buffer);
+				//memset(buffer, 0, BUFLEN);
 			}
 
-			else if (i == unlock_fd) {
+			else if (i == unlock_fd && FD_ISSET(i, &modified)) {
 				printf("Am ceva pe UDP În client\n");
 				memset(buffer, 0, BUFLEN);
 				socklen_t struct_size =(socklen_t)sizeof(receive_addr_udp);
 				recvfrom(unlock_fd, buffer, BUFLEN, 0,
 						(struct sockaddr *)&receive_addr_udp, &struct_size);
 				printf("Am primit raspuns pe udp %s\n", buffer);
+				//check the response
+
 			}
 			
-			else if (i == sockfd) {
+			else if (i == sockfd && FD_ISSET(i, &modified)) {
 				/*
 				 * If the buffer is empty, it means
 				 * I have not send any information and that
