@@ -277,6 +277,14 @@ int main(int argc, char ** argv)
 				 * Quit
 				 */
 				if (get_command_code(buffer) == QUIT_CMD) {
+					/*
+					 * Let the server know you want to close the
+					 * connection
+					 */
+					send(sockfd, buffer, BUFLEN, 0);
+					/*
+					 * Close local connection
+					 */
 					close(sockfd);
 					exit(0);
 				}

@@ -788,6 +788,12 @@ int main(int argc, char ** argv)
 								 }
 								 break;
 							}
+							case QUIT_CMD:
+							{
+								close (server_sock);
+								exit(0);
+								break;
+							}
 							default:
 							{
 								printf("%d Default command\n", DEFAULT_CMD);
