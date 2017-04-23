@@ -27,15 +27,22 @@ using namespace std;
 #define QUIT_CMD 10
 #define DEFAULT_CMD 1
 #define UPLOAD_CMD 2
-#define LOGIN_CMD 10
+#define LOGIN_CMD 11
+#define UNLOCK_CMD 8
 #define CARD_NO_INEXISTENT -4
 #define WRONG_PIN -3
 #define UNLOCK_ERROR 101
 #define UNLOCK_SUCCESSFUL 102
+#define UNLOCK_INEXISTENT_CARD_NO -4
+#define UNLOCK_WRONG_PIN -7
+
 
 #define LOGOUT_INVALID_USER -1
 #define LOGOUT_SUCCESSFUL 1001
 #define UNKNOWN_USER -11
+
+#define LOGGED_IN 1
+#define LOGGED_OUT 0
 
 /*
  * All about server socket
@@ -51,7 +58,13 @@ struct sockaddr_in server_addr_udp;
  */
 int result;
 char buffer[BUFLEN];
+/*
+ * Open session
+ */
+char card_no[BUFLEN];
+char pin[BUFLEN];
 char credentials[BUFLEN];
+int logged_in;
 
 /*
  * For select call
@@ -68,11 +81,14 @@ int get_command_code(char *command)
 	memset(copy, 0, BUFLEN);
 	memcpy(copy, command, BUFLEN);
 	tok = strtok(copy, " \n");
-	if (strcmp (tok, "quit") == 0) {
+	if (strcmp (tok, "quit") == 0)
 		return QUIT_CMD;
-	}
 	if (strcmp (tok, "upload") == 0)
 		return UPLOAD_CMD;
+	if (strcmp (tok, "unlock") == 0)
+		return UNLOCK_CMD;
+	if (strcmp(tok, "login") == 0)
+		return LOGIN_CMD;
 	return DEFAULT_CMD;
 }
 
@@ -131,6 +147,7 @@ void write_log(char *buff)
 
 int main(int argc, char ** argv)
 {
+	logged_in = LOGGED_OUT;
 	if (argc <= 2){
 		perror("./client <server IP> <server PORT> \n");
 		exit(1);
@@ -200,7 +217,7 @@ int main(int argc, char ** argv)
 	 * Do what select is meant to do
 	 */
 	FD_SET(STDIN_FILENO, &original);
-	FD_SET(sockfd, &original);
+	FD_SET(sockfd, &origisock_sizesock_sizenal);
 	if (sockfd > fdmax)
 		fdmax = sockfd;
 
@@ -220,7 +237,7 @@ int main(int argc, char ** argv)
 		
 		for (int i = 0; i <= fdmax; ++i) {
 			/*
-			 * If I need to read from stdin
+			 * Ifock_sizeI need to read from stdin
 			 */
 			if (i == STDIN_FILENO) {
 				read(STDIN_FILENO, buffer, BUFLEN);
@@ -236,37 +253,23 @@ int main(int argc, char ** argv)
 					close(sockfd);
 					exit(0);
 				}
-				if (get_command_code(buffer) == UPLOAD_CMD) {
-					/*
-					 * Get the argument of the upload command
-					 */
-					char *argument;
-					get_argument(buffer, &argument);
-					printf("File argument is %s\n", argument);
-
-					/*
-					 * If the file exists, fopen should return != NULL
-					 */
-					FILE *file = fopen(argument, "rb");
-					if (file == NULL){
-						/*
-						 * Output file does not exist
-						 */
-						char message[] = "-4 Fisier inexistent";
-						printf("%s\n", message);
-						write_log(message);
-						memset(buffer, 0, BUFLEN);
-						continue;
-					}
-					fclose(file);
-				}
 				if (get_command_code(buffer) == LOGIN_CMD){
 					//get the credentials so that unlock
 					//would know what user is going to connect
-					char card_no[BUFLEN];
-					char pin[BUFLEN];
 					get_login_credentials(buffer, card_no, pin);
 					printf("Login credentials = %s %s\n", card_no, pin);
+					char command[BUFLEN];
+				}
+				if (get_command_code(buffer) == UNLOCK_CMD){
+					//put " " instead of \n
+					buffer[strlen(buffer) -1] =' ';	
+					strcat(buffer, card_no);
+					//send_to on udp sock	et
+					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
+					sendto(unlock_fd, buffer, BUFLEN, 0,
+						(const struct sockaddr *)&server_addr_udp, sock_size); 
+					printf("sent unlock request with %s\n", buffer);
+					//continue;
 				}
 				/*
 				 * Send the command to server
@@ -303,6 +306,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> Login successful\n";
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
+						logged_in = LOGGED_IN;
 						break;
 					}
 					case LOGIN_BRUTE_FORCE:
@@ -331,6 +335,10 @@ int main(int argc, char ** argv)
 					case LOGOUT_SUCCESSFUL:
 					{
 						memset(buffer, 0, BUFLEN);
+						//clear the saved credentials
+						memset(card_no, 0, BUFLEN);
+						memset(pin, 0, BUFLEN);
+						logged_in = LOGGED_OUT;
 						break;
 					}
 					case NOT_LOGGED_IN:

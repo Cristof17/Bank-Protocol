@@ -41,6 +41,9 @@
 #define LOGOUT_SUCCESSFUL 1001
 #define UNLOCK_ERROR 101
 #define UNLOCK_SUCCESSFUL 102
+#define UNLOCK_INEXISTENT_CARD_NO -4
+#define UNLOCK_WRONG_PIN -7
+#define UNLOCK_REQUEST_PIN 10102
 
 /*
  * Globals
@@ -56,6 +59,9 @@
 
 #define LOGGED_IN 1
 #define LOGGED_OUT 0
+
+#define CARD_NO_EXISTS 1
+#define CARD_NO_NOT_EXISTS 0
 
 using namespace std;
 
@@ -131,6 +137,29 @@ void block_card(login_params *params){
 	blocked_cards[blocked_cards_no] = params->card_no;
 }
 
+int check_unlock_card_no(char *card_no){
+	long card_no_long = 0;
+	int i = 0;
+	card_no_long = atol(card_no);
+	for (i = 0; i < user_count; ++i){
+		if (users[i]->card_no == card_no_long)
+			return CARD_NO_EXISTS;
+	}
+	return CARD_NO_NOT_EXISTS;
+}
+
+int get_fd_for_card_no(long card_no){
+	int i = 0;
+	for (i = 0; i < user_count; ++i){
+		if (users[i] != NULL){
+			if (users[i]->card_no == card_no){
+				return users[i]->fd;
+			}
+		}
+	}
+	return -1;
+}
+
 //to unblock a card you just need to set the value to -1 for a given cardno
 int unlock(long card_no, int pin){
 	int i = 0;
@@ -144,11 +173,14 @@ int unlock(long card_no, int pin){
 			//if the pin is ok for the given card	
 			//curr holds the number of users
 			for (j = 0; j < user_count; ++j){
-				if (users[j]->card_no == card_no &&
-					users[j]->pin == pin){
-					blocked_cards[i] = -1;
-					printf("Unblocking card\n");
-					return UNLOCK_SUCCESSFUL;		
+				if (users[j]->card_no == card_no){
+					if (users[j]->pin == pin){
+						blocked_cards[i] = -1;
+						printf("Unblocking card\n");
+						return UNLOCK_SUCCESSFUL;
+					} else {
+						return UNLOCK_WRONG_PIN;
+					}		
 				}
 			}
 		}
@@ -174,6 +206,17 @@ int get_command_code(char *command)
 		return UNLOCK_CMD;
 
 	return DEFAULT_CMD;
+}
+
+void get_unlock_card_no(char *command, char *card_no){
+	char copy[BUFLEN];
+	memset(copy, 0, BUFLEN);
+	char *tok;
+	memcpy(copy, command, BUFLEN);
+	tok = strtok(copy, " \t\n");
+	if (tok != NULL){
+		strcpy(card_no, tok);
+	}
 }
 
 //int the pos variable it is returned the position
@@ -346,6 +389,22 @@ user_t *get_user_by_name(char *name)
 	return NULL;
 }
 
+void get_unlock_credentials(char *command, long *card_no, int *pin)
+{
+	char copy[BUFLEN];
+	char *tok;
+	memset(copy, 0, BUFLEN);
+	strcpy(copy, command);
+	tok = strtok(copy, " \n");
+	if (tok != NULL){
+		*card_no = atol(tok);
+	}
+	tok = strtok(NULL, "\n ");
+	if (tok != NULL){	
+		*pin = atoi(tok);
+	}
+}
+
 int main(int argc, char ** argv)
 {
 	if (argc <= 2){
@@ -470,7 +529,6 @@ int main(int argc, char ** argv)
 		int i;
 		for(i = 0; i <= fdmax; i++) {
 			if (FD_ISSET(i, &modified)) {
-			
 				if (i == server_sock) {
 					// a venit ceva pe socketul inactiv(cel cu listen) = o noua conexiune
 					// actiunea serverului: accept()
@@ -489,6 +547,70 @@ int main(int argc, char ** argv)
 					printf("Noua conexiune la server \n");
 				} else if (i == unlock_sock){
 					//unlock logic
+					char buffer[BUFLEN];
+					char card_no[BUFLEN];
+					memset(buffer, 0, BUFLEN);
+					socklen_t addr_size = (socklen_t)sizeof(server_addr_udp);
+					result = recvfrom(unlock_sock, buffer, BUFLEN, 0,
+							 (struct sockaddr*) &server_addr_udp, &addr_size);
+					if (result < 0){
+						perror("Did not receive on UDP socket");
+						continue;
+					}
+					/*
+					 * Check if command is Unlock
+					 */
+					int command = get_command_code(buffer);
+					switch(command) {
+						case UNLOCK_CMD:
+						{
+							get_unlock_card_no(buffer, card_no);
+							/*
+							 * Check if the card_no exists
+							 */
+							if (check_unlock_card_no(card_no) == CARD_NO_EXISTS){
+								//send UNLOCK_PASS_REQEUST
+								int fd = get_fd_for_card_no(atol(card_no));
+								send_client_code(fd, UNLOCK_REQUEST_PIN);
+								//use recvfrom to ge the card_no and pass
+								memset(buffer, 0, BUFLEN);
+								result = recvfrom(unlock_sock, buffer, BUFLEN, 0,
+										 (struct sockaddr*) &server_addr_udp, &addr_size);
+								if (result < 0){
+									perror("Did not receive on UDP socket");
+									continue;
+								}
+								//parse card_no and pin
+								long card_no = 0;
+								int pin = 0;
+								get_unlock_credentials(buffer, &card_no, &pin);
+								printf("Received unlock credentials %s \n", buffer);
+								result = unlock(card_no, pin);
+								switch(result) {
+									case UNLOCK_SUCCESSFUL:
+									{
+										break;
+									}
+									case UNLOCK_ERROR:
+									{
+										break;
+									}
+									case UNLOCK_WRONG_PIN:
+									{
+										break;
+									}
+								}
+								
+							} else {
+								//send -4 message
+								int fd = get_fd_for_card_no(atol(card_no));
+								send_client_code(fd, UNLOCK_INEXISTENT_CARD_NO);
+							}
+							break;
+						}
+					}
+					
+					
 				} else if (i == STDIN_FILENO) {
 					char buffer[BUFLEN];
 					memset(buffer, 0, BUFLEN);
