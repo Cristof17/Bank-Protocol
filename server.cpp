@@ -93,6 +93,7 @@ int unlock_sock ; //UDP Socket
 int client_sock;
 struct sockaddr_in server_addr_tcp;
 struct sockaddr_in server_addr_udp;
+struct sockaddr_in client_addr_udp;
 struct sockaddr_in client_addr;
 
 /*
@@ -202,20 +203,31 @@ int get_command_code(char *command)
 		return GET_MONEY_CMD;
 	else if (strcmp(command, "putmoney") == 0)
 		return PUT_MONEY_CMD;
-	else if (strcmp(command, "unlock") == 0)
-		return UNLOCK_CMD;
 
 	return DEFAULT_CMD;
+}
+
+int check_if_unlock_cmd(char *command){
+	char copy[BUFLEN];
+	memset(copy, 0, BUFLEN);
+	strcpy(copy, command);
+	char *tok = strtok(copy, " ");
+	if (strcmp(tok, "unlock") == 0){
+		return 1;
+	}
+	return 0;
 }
 
 void get_unlock_card_no(char *command, char *card_no){
 	char copy[BUFLEN];
 	memset(copy, 0, BUFLEN);
 	char *tok;
-	memcpy(copy, command, BUFLEN);
+	strcpy(copy, command);
 	tok = strtok(copy, " \t\n");
 	if (tok != NULL){
-		strcpy(card_no, tok);
+		tok = strtok(NULL, " \t\n");
+		if (tok != NULL)
+			strcpy(card_no, tok);
 	}
 }
 
@@ -231,7 +243,7 @@ int login(login_params_t *params, int *pos)
 				status = ALREADY_LOGGED_IN;
 			} else {
 				if (users[i]->pin == params->pin){
-					users[i]->logged_in = LOGGED_IN;	
+						users[i]->logged_in = LOGGED_IN;	
 					users[i]->login_attempts = 0;
 					status = SUCCESS;
 					*pos = i;
@@ -286,6 +298,15 @@ void send_client_code(int fd, int code)
 	sprintf(buf, "%d", code);
 	printf("Sending %d code %s\n", fd, buf);
 	send(fd, buf, BUFLEN, 0);
+}
+
+void send_udp_client_code(struct sockaddr *client_address, int fd, int code){
+	char buffer[BUFLEN];
+	memset(buffer, 0, BUFLEN);
+	sprintf(buffer, "%d", code);
+	int saddr_size = sizeof(struct sockaddr);
+	sendto(fd, buffer, BUFLEN, 0, client_address, saddr_size); 
+	return;
 }
 
 void send_client_message(int fd, char *message)
@@ -464,6 +485,11 @@ int main(int argc, char ** argv)
 	 server_addr_udp.sin_port = htons (atoi(argv[1]));
 	
 	/*
+	 * Set clent address full of 0s
+	 */
+	 memset((char *)&client_addr_udp, 0, sizeof(client_addr_udp));
+	 	
+	/*
 	 * Bind TCP socket to address and  port
 	 */
 
@@ -481,8 +507,6 @@ int main(int argc, char ** argv)
 		perror("Cannot bind UDP Socket");
 		exit(1);
 	}
-
-
 	
 	/*
 	 * Call listen call
@@ -546,71 +570,69 @@ int main(int argc, char ** argv)
 					}
 					printf("Noua conexiune la server \n");
 				} else if (i == unlock_sock){
+					printf("Aud ceva pe UDP \n");
 					//unlock logic
 					char buffer[BUFLEN];
 					char card_no[BUFLEN];
 					memset(buffer, 0, BUFLEN);
 					socklen_t addr_size = (socklen_t)sizeof(server_addr_udp);
 					result = recvfrom(unlock_sock, buffer, BUFLEN, 0,
-							 (struct sockaddr*) &server_addr_udp, &addr_size);
+							 (struct sockaddr*) &client_addr_udp, &addr_size);
 					if (result < 0){
 						perror("Did not receive on UDP socket");
 						continue;
-					}
+					} 
 					/*
 					 * Check if command is Unlock
 					 */
-					int command = get_command_code(buffer);
-					switch(command) {
-						case UNLOCK_CMD:
-						{
-							get_unlock_card_no(buffer, card_no);
-							/*
-							 * Check if the card_no exists
-							 */
-							if (check_unlock_card_no(card_no) == CARD_NO_EXISTS){
-								//send UNLOCK_PASS_REQEUST
-								int fd = get_fd_for_card_no(atol(card_no));
-								send_client_code(fd, UNLOCK_REQUEST_PIN);
-								//use recvfrom to ge the card_no and pass
-								memset(buffer, 0, BUFLEN);
-								result = recvfrom(unlock_sock, buffer, BUFLEN, 0,
-										 (struct sockaddr*) &server_addr_udp, &addr_size);
-								if (result < 0){
-									perror("Did not receive on UDP socket");
-									continue;
+					if (check_if_unlock_cmd(buffer)){
+						printf("am primit %s\n", buffer);
+						get_unlock_card_no(buffer, card_no);
+						printf("Card no = %s\n", card_no);
+						/*
+						 * Check if the card_no exists
+						 */
+						if (check_unlock_card_no(card_no) == CARD_NO_EXISTS){
+							//send UNLOCK_PASS_REQEUST
+							printf("Trimit pe UDP cod de pin\n");
+							send_udp_client_code((struct sockaddr*) &client_addr_udp,
+												unlock_sock, UNLOCK_REQUEST_PIN);
+							//use recvfrom to ge the card_no and pass
+							memset(buffer, 0, BUFLEN);
+							result = recvfrom(unlock_sock, buffer, BUFLEN, 0,
+									 (struct sockaddr*) &client_addr_udp, &addr_size);
+							if (result < 0){
+								perror("Did not receive on UDP socket");
+								continue;
+							} 								//parse card_no and pin
+							long card_no = 0;
+							int pin = 0;
+							get_unlock_credentials(buffer, &card_no, &pin);
+							printf("Received unlock credentials %s \n", buffer);
+							result = unlock(card_no, pin);
+							switch(result) {
+								case UNLOCK_SUCCESSFUL:
+								{
+									break;
 								}
-								//parse card_no and pin
-								long card_no = 0;
-								int pin = 0;
-								get_unlock_credentials(buffer, &card_no, &pin);
-								printf("Received unlock credentials %s \n", buffer);
-								result = unlock(card_no, pin);
-								switch(result) {
-									case UNLOCK_SUCCESSFUL:
-									{
-										break;
-									}
-									case UNLOCK_ERROR:
-									{
-										break;
-									}
-									case UNLOCK_WRONG_PIN:
-									{
-										break;
-									}
+								case UNLOCK_ERROR:
+								{
+									break;
 								}
-								
-							} else {
-								//send -4 message
-								int fd = get_fd_for_card_no(atol(card_no));
-								send_client_code(fd, UNLOCK_INEXISTENT_CARD_NO);
+								case UNLOCK_WRONG_PIN:
+								{
+									break;
+								}
 							}
-							break;
+							
+						} else {
+							//send -4 message
+							send_udp_client_code((struct sockaddr*)&client_addr_udp,
+												i, UNLOCK_INEXISTENT_CARD_NO);
+							printf("Am trimis pe UDP -5\n");
 						}
+						break;
 					}
-					
-					
 				} else if (i == STDIN_FILENO) {
 					char buffer[BUFLEN];
 					memset(buffer, 0, BUFLEN);

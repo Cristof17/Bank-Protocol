@@ -35,6 +35,7 @@ using namespace std;
 #define UNLOCK_SUCCESSFUL 102
 #define UNLOCK_INEXISTENT_CARD_NO -4
 #define UNLOCK_WRONG_PIN -7
+#define UNLOCK_REQUEST_PIN 10102
 
 
 #define LOGOUT_INVALID_USER -1
@@ -52,6 +53,7 @@ int unlock_fd;
 int client_file_fd;
 struct sockaddr_in server_addr_tcp;
 struct sockaddr_in server_addr_udp;
+struct sockaddr_in receive_addr_udp;
 
 /*
  * Variables for local purposes
@@ -175,6 +177,7 @@ int main(int argc, char ** argv)
 	/*
 	 * Setup the socket
 	 */
+	memset(&server_addr_tcp, 0, sizeof(server_addr_tcp));
 	server_addr_tcp.sin_family = AF_INET;
 	server_addr_tcp.sin_addr.s_addr = inet_addr(argv[1]);
 	server_addr_tcp.sin_port = htons(atoi(argv[2]));
@@ -182,9 +185,12 @@ int main(int argc, char ** argv)
 	/*
 	 * Setup the socket
 	 */
-	server_addr_udp.sin_family = AF_INET;
+	memset(&server_addr_udp, 0, sizeof(server_addr_udp));
+	server_addr_udp.sin_family = PF_INET;
 	server_addr_udp.sin_addr.s_addr = inet_addr(argv[1]);
 	server_addr_udp.sin_port = htons(atoi(argv[2]));
+
+	memset(&receive_addr_udp, 0, sizeof(receive_addr_udp));
 
 
 	/*
@@ -217,9 +223,13 @@ int main(int argc, char ** argv)
 	 * Do what select is meant to do
 	 */
 	FD_SET(STDIN_FILENO, &original);
-	FD_SET(sockfd, &origisock_sizesock_sizenal);
+	FD_SET(sockfd, &original);
+	FD_SET(unlock_fd, &original);
+
 	if (sockfd > fdmax)
 		fdmax = sockfd;
+	if (unlock_fd > fdmax)
+		fdmax = unlock_fd;
 
 	while(1) {
 
@@ -267,9 +277,9 @@ int main(int argc, char ** argv)
 					//send_to on udp sock	et
 					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
 					sendto(unlock_fd, buffer, BUFLEN, 0,
-						(const struct sockaddr *)&server_addr_udp, sock_size); 
+						(struct sockaddr *)&server_addr_udp, sock_size); 
 					printf("sent unlock request with %s\n", buffer);
-					//continue;
+					continue;
 				}
 				/*
 				 * Send the command to server
@@ -279,6 +289,15 @@ int main(int argc, char ** argv)
 				 * Log the command
 				 */
 				write_log(buffer);
+			}
+
+			else if (i == unlock_fd) {
+				printf("Am ceva pe UDP În client\n");
+				memset(buffer, 0, BUFLEN);
+				socklen_t struct_size =(socklen_t)sizeof(receive_addr_udp);
+				recvfrom(unlock_fd, buffer, BUFLEN, 0,
+						(struct sockaddr *)&receive_addr_udp, &struct_size);
+				printf("Am primit raspuns pe udp %s\n", buffer);
 			}
 			
 			else if (i == sockfd) {
