@@ -23,11 +23,10 @@
 #define LOGIN_BRUTE_FORCE -8
 #define QUIT_CMD 3
 #define LOGOUT_CMD 4
-#define LISTSOLD_CMD 5
 #define GET_MONEY_CMD 6
 #define PUT_MONEY_CMD 7
 #define UNLOCK_CMD 8
-
+#define LISTSOLD_CMD 9
 /*
  * Responses
  */
@@ -45,6 +44,7 @@
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
 #define UNLOCK_UNBLOCKED_CARD -6
+#define LISTSOLD_SUCCESSFUL 12
 
 /*
  * Globals
@@ -84,7 +84,7 @@ typedef struct user{
 	long card_no;
 	int pin;
 	char *password;
-	float balance;
+	double balance;
 	int login_attempts;
 	int logged_in;
 } user_t;
@@ -325,6 +325,16 @@ void send_client_message(int fd, char *message)
 	memset(buf, 0, BUFLEN);
 	memcpy(buf, message, BUFLEN);
 	send(fd, buf, BUFLEN, 0);
+}
+
+user_t *get_user_by_fd(int fd){
+	int i = 0;
+	for (i = 0; i < user_count; ++i){
+		if (users[i]->fd == fd){
+			return users[i];
+		}
+	}
+	return NULL;
 }
 
 /*
@@ -787,6 +797,21 @@ int main(int argc, char ** argv)
 										break;
 								 }
 								 break;
+							}
+							case LISTSOLD_CMD:
+							{
+								printf("List sold received\n");
+								char message[BUFLEN];
+								user_t *curr_user = get_user_by_fd(i);
+								if (curr_user != NULL){
+									memset(message, 0, BUFLEN);
+									sprintf(message, "%.2lf", curr_user->balance);
+									send_client_code(i, LISTSOLD_SUCCESSFUL);
+									send(i, message, BUFLEN, 0);
+								} else {
+									send_client_code(i, NOT_LOGGED_IN);	
+								}
+								break;
 							}
 							case QUIT_CMD:
 							{

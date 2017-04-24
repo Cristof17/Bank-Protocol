@@ -29,6 +29,7 @@ using namespace std;
 #define UPLOAD_CMD 2
 #define LOGIN_CMD 11
 #define UNLOCK_CMD 8
+#define LISTSOLD_CMD 9
 #define CARD_NO_INEXISTENT -4
 #define WRONG_PIN -3
 #define UNLOCK_ERROR 101
@@ -37,6 +38,7 @@ using namespace std;
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
 #define UNLOCK_UNBLOCKED_CARD -6
+#define LISTSOLD_SUCCESSFUL 12
 
 
 #define LOGOUT_INVALID_USER -1
@@ -499,6 +501,28 @@ int main(int argc, char ** argv)
 						printf("%s\n", message);
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
+						break;
+					}
+					case LISTSOLD_SUCCESSFUL:
+					{
+						/*
+						 * Append ATM at the begining og the message
+						 */
+						memset(buffer, 0, BUFLEN);
+						char message[BUFLEN];
+						memset(message, 0, BUFLEN);
+						sprintf(message, "ATM> ");
+						/*
+						 * Get the numbers from the server
+						 */
+						recv(i, buffer, BUFLEN, 0);
+						strcat(message, buffer);
+						strcat(message, "\n");
+						/*
+						 * Log and print
+						 */
+						write_log(message);
+						fputs(message,stdout);
 						break;
 					}
 					case DEFAULT_CMD:
