@@ -20,7 +20,7 @@ using namespace std;
  * Responses
  */
 #define SUCCESS 100000
-#define LOGIN_BRUTE_FORCE -8
+#define LOGIN_BRUTE_FORCE -5
 #define ALREADY_LOGGED_IN -2
 #define NOT_LOGGED_IN -10
 
@@ -39,6 +39,9 @@ using namespace std;
 #define UNLOCK_REQUEST_PIN 10102
 #define UNLOCK_UNBLOCKED_CARD -6
 #define LISTSOLD_SUCCESSFUL 12
+#define GET_MONEY_NOT_MULTIPLE -9                                                  
+#define GET_MONEY_SUMM_TOO_LARGE -8 
+#define GET_MONEY_SUCCESSFUL 1231
 
 
 #define LOGOUT_INVALID_USER -1
@@ -449,8 +452,8 @@ int main(int argc, char ** argv)
 					}
 					case LOGIN_BRUTE_FORCE:
 					{
-						printf("ATM> -8 : Brute force detectat\n");
-						char message[] = "ATM> -8 : Brute force detectat\n";
+						printf("ATM> -5 : Card blocat\n");
+						char message[] = "ATM> -5 : Card blocat\n";
 						write_log(message);
 						break;
 					}
@@ -523,6 +526,32 @@ int main(int argc, char ** argv)
 						 */
 						write_log(message);
 						fputs(message,stdout);
+						break;
+					}
+					case GET_MONEY_NOT_MULTIPLE:
+					{
+						char message[] = "ATM> -9 : Suma nu e multiplu de 10\n";
+						write_log(message);
+						fputs(message, stdout);
+						break;
+					}
+					case GET_MONEY_SUMM_TOO_LARGE:
+					{
+						char message[] = "ATM> -8 : Fonduri insuficiente\n";
+						write_log(message);
+						fputs(message, stdout);
+						break;
+					}
+					case GET_MONEY_SUCCESSFUL:
+					{
+						char message[BUFLEN];
+						memset(message, 0, BUFLEN);
+						sprintf(message, "ATM> Suma ");
+						memset(buffer, 0, BUFLEN);
+						strcat(message, buffer);
+						strcat(message, " retrasa cu succes\n");
+						write_log(message);
+						fputs(message, stdout);
 						break;
 					}
 					case DEFAULT_CMD:

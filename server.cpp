@@ -20,7 +20,7 @@
  */
 #define LOGIN_CMD 10
 #define DEFAULT_CMD 1
-#define LOGIN_BRUTE_FORCE -8
+#define LOGIN_BRUTE_FORCE -5
 #define QUIT_CMD 3
 #define LOGOUT_CMD 4
 #define GET_MONEY_CMD 6
@@ -45,7 +45,9 @@
 #define UNLOCK_REQUEST_PIN 10102
 #define UNLOCK_UNBLOCKED_CARD -6
 #define LISTSOLD_SUCCESSFUL 12
-
+#define GET_MONEY_NOT_MULTIPLE -9
+#define GET_MONEY_SUMM_TOO_LARGE -8
+#define GET_MONEY_SUCCESSFUL 1231
 /*
  * Globals
  */
@@ -337,6 +339,24 @@ user_t *get_user_by_fd(int fd){
 	return NULL;
 }
 
+int substract_from_balance(int fd, long summ){
+	/*
+	 * Get the user for the given fd
+	 */
+	user_t *user = get_user_by_fd(fd); 
+	if (user != NULL){
+		return NOT_LOGGED_IN;
+	}
+	if (summ % 10 != 0){
+		return GET_MONEY_NOT_MULTIPLE;
+	}
+	if (summ > user->balance){
+		return GET_MONEY_SUMM_TOO_LARGE;
+	}
+	user->balance = user->balance - summ;
+	return GET_MONEY_SUCCESSFUL;
+}
+
 /*
  * Get the list of users from the file
  */
@@ -451,6 +471,20 @@ void set_fd_for_card_no(long card_no, int fd){
 	for (i = 0; i < user_count; ++i){
 		if (users[i]->card_no == card_no){
 			users[i]->fd = fd;
+		}
+	}
+}
+
+void get_summ_from_command(char *command, long *summ){
+	char copy[BUFLEN];
+	char *tok;
+	memset(copy, 0, BUFLEN);
+	strcpy(copy, command);
+	tok = strtok(copy, " \n\t");	
+	if (tok != NULL){
+		tok = strtok(NULL, " \n\t");
+		if (tok != NULL){
+			*summ = atol(tok);
 		}
 	}
 }
@@ -811,6 +845,52 @@ int main(int argc, char ** argv)
 								} else {
 									send_client_code(i, NOT_LOGGED_IN);	
 								}
+								break;
+							}
+							case GET_MONEY_CMD:
+							{
+								/*
+								 * Get the summ of money to extract
+								 */
+								 long summ = 0;
+								 get_summ_from_command(buffer, &summ);
+								 
+								/*
+								 * Substract summ ang get error code
+								 */
+								result = substract_from_balance(i, summ);
+								switch (result){
+									case NOT_LOGGED_IN:
+									{
+										send_client_code(i, NOT_LOGGED_IN);
+										break;
+									}
+									case GET_MONEY_NOT_MULTIPLE:
+									{
+										send_client_code(i, GET_MONEY_NOT_MULTIPLE);
+										break;
+									}
+									case GET_MONEY_SUMM_TOO_LARGE:
+									{
+										send_client_code(i, GET_MONEY_SUMM_TOO_LARGE);
+										break;
+									}
+									case GET_MONEY_SUCCESSFUL:
+									{
+										send_client_code(i, GET_MONEY_SUCCESSFUL);
+										/*
+										 * Send the summ extracted to print it
+										 */
+										memset(buffer, 0, BUFLEN);
+										sprintf(buffer, "%ld", summ);
+										send(i, buffer, BUFLEN, 0);
+										break;
+									}
+								}
+								break;
+							}
+							case PUT_MONEY_CMD:
+							{
 								break;
 							}
 							case QUIT_CMD:
