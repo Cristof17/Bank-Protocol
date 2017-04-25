@@ -1,3 +1,4 @@
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +49,7 @@
 #define GET_MONEY_NOT_MULTIPLE -9
 #define GET_MONEY_SUMM_TOO_LARGE -8
 #define GET_MONEY_SUCCESSFUL 1231
+#define PUT_MONEY_SUCCESSFUL 1232
 /*
  * Globals
  */
@@ -301,6 +303,7 @@ int logout(int user_connection)
 	 */
 	user->logged_in = LOGGED_OUT;
 	user->login_attempts = 0;
+	user->fd = -1;
 	 return LOGOUT_SUCCESSFUL;
 }
 void send_client_code(int fd, int code)
@@ -329,32 +332,47 @@ void send_client_message(int fd, char *message)
 	send(fd, buf, BUFLEN, 0);
 }
 
-user_t *get_user_by_fd(int fd){
+int get_user_pos_by_fd(int fd){
 	int i = 0;
 	for (i = 0; i < user_count; ++i){
 		if (users[i]->fd == fd){
-			return users[i];
+			return i;
 		}
 	}
-	return NULL;
+	return -1;
 }
 
 int substract_from_balance(int fd, long summ){
 	/*
 	 * Get the user for the given fd
 	 */
-	user_t *user = get_user_by_fd(fd); 
-	if (user != NULL){
+	int pos = get_user_pos_by_fd(fd);
+	if (pos == -1)
+		return NOT_LOGGED_IN;
+	if (users[pos] == NULL){
 		return NOT_LOGGED_IN;
 	}
 	if (summ % 10 != 0){
 		return GET_MONEY_NOT_MULTIPLE;
 	}
-	if (summ > user->balance){
+	if (summ > users[pos]->balance){
 		return GET_MONEY_SUMM_TOO_LARGE;
 	}
-	user->balance = user->balance - summ;
+	users[pos]->balance = users[pos]->balance - summ;
 	return GET_MONEY_SUCCESSFUL;
+}
+
+int put_summ_in_balance(int fd, long summ){
+	/*
+	 * Get the user for the given fd
+	 */
+	int pos = get_user_pos_by_fd(fd);
+	if (pos == -1)
+			return NOT_LOGGED_IN;
+	if (users[pos] == NULL)
+		return NOT_LOGGED_IN;
+	users[pos]->balance += summ;
+	return PUT_MONEY_SUCCESSFUL;
 }
 
 /*
@@ -416,7 +434,7 @@ void get_users_from_file(user_t **out)
 		);
 		user_count++;
 	 }
-	 printf("Finished reading users from file \n");
+	 printf("Finished reading users from file user_count = %d \n", user_count);
 }
 
 
@@ -435,19 +453,17 @@ void create_users()
 	get_users_from_file(users);
 }
 
-user_t *get_user_by_name(char *name)
+int get_user_pos_by_name(char *name)
 {
 	int users_count = get_users_from_file_count();
-	if (name == NULL)
-		return NULL;
 	for (int i = 0; i < users_count; ++i) {
 		if (users[i] == NULL)
 			continue;
 		if (strcmp(users[i]->name, name) == 0){
-			return users[i];
+			return i;
 		}
 	}
-	return NULL;
+	return -1;
 }
 
 void get_unlock_credentials(char *command, long *card_no, char *password)
@@ -603,7 +619,6 @@ int main(int argc, char ** argv)
 	 */
 	if (users == NULL)
 		users = (user_t **)malloc(MAX_USERS * sizeof(user_t *));
-	get_users_from_file(users);
 	
 	/*
 	 * Listen for incoming connections
@@ -836,7 +851,9 @@ int main(int argc, char ** argv)
 							{
 								printf("List sold received\n");
 								char message[BUFLEN];
-								user_t *curr_user = get_user_by_fd(i);
+								user_t *curr_user;
+								int curr_user_pos = get_user_pos_by_fd(i);
+								curr_user = users[curr_user_pos];
 								if (curr_user != NULL){
 									memset(message, 0, BUFLEN);
 									sprintf(message, "%.2lf", curr_user->balance);
@@ -852,13 +869,20 @@ int main(int argc, char ** argv)
 								/*
 								 * Get the summ of money to extract
 								 */
-								 long summ = 0;
-								 get_summ_from_command(buffer, &summ);
+								double summ = 0;
+								char payload[BUFLEN];
+								memset(payload, 0, BUFLEN);
+								char *tok = strtok(NULL, " \n\t");
+								sscanf(tok, "%lf\n", &summ); 
 								 
 								/*
 								 * Substract summ ang get error code
 								 */
-								result = substract_from_balance(i, summ);
+								int j =0;
+								for (j = 0; j < user_count; ++j){
+									printf("User %s logged in on %d\n", users[j]->name, users[j]->fd);
+								}
+								result = substract_from_balance(i, (long)summ);
 								switch (result){
 									case NOT_LOGGED_IN:
 									{
@@ -878,12 +902,6 @@ int main(int argc, char ** argv)
 									case GET_MONEY_SUCCESSFUL:
 									{
 										send_client_code(i, GET_MONEY_SUCCESSFUL);
-										/*
-										 * Send the summ extracted to print it
-										 */
-										memset(buffer, 0, BUFLEN);
-										sprintf(buffer, "%ld", summ);
-										send(i, buffer, BUFLEN, 0);
 										break;
 									}
 								}
@@ -891,10 +909,35 @@ int main(int argc, char ** argv)
 							}
 							case PUT_MONEY_CMD:
 							{
+								double summ=0;
+								char payload[BUFLEN];
+								memset(payload, 0, BUFLEN);
+								char *tok = strtok(NULL, " \n\t");
+								sscanf(tok, "%lf\n", &summ); 
+								printf("summ from command = %lf\n", summ);
+								result = put_summ_in_balance(i, (long)summ);
+								switch (result) {
+									case NOT_LOGGED_IN:
+									{
+										send_client_code(i, NOT_LOGGED_IN);
+										break;
+									}
+									case PUT_MONEY_SUCCESSFUL:
+									{
+										send_client_code(i, PUT_MONEY_SUCCESSFUL);
+										break;
+									}
+									default:
+									{
+										break;
+									}
+								}
+
 								break;
 							}
 							case QUIT_CMD:
 							{
+
 								close (server_sock);
 								exit(0);
 								break;

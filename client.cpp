@@ -42,6 +42,59 @@ using namespace std;
 #define GET_MONEY_NOT_MULTIPLE -9                                                  
 #define GET_MONEY_SUMM_TOO_LARGE -8 
 #define GET_MONEY_SUCCESSFUL 1231
+#define PUT_MONEY_SUCCESSFUL 1232
+
+
+#define LOGOUT_INVALID_USER -1
+#define LOGOUT_SUCCESSFUL 1001
+#define UNKNOWN_USER -11
+
+#define LOGGED_IN 1
+#define LOGGED_OUT 0
+#include <iostream>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+using namespace std;
+
+#define BUFLEN 255
+
+
+/*
+ * Responses
+ */
+#define SUCCESS 100000
+#define LOGIN_BRUTE_FORCE -5
+#define ALREADY_LOGGED_IN -2
+#define NOT_LOGGED_IN -10
+
+#define QUIT_CMD 10
+#define DEFAULT_CMD 1
+#define UPLOAD_CMD 2
+#define LOGIN_CMD 11
+#define UNLOCK_CMD 8
+#define LISTSOLD_CMD 9
+#define CARD_NO_INEXISTENT -4
+#define WRONG_PIN -3
+#define UNLOCK_ERROR 101
+#define UNLOCK_SUCCESSFUL 102
+#define UNLOCK_INEXISTENT_CARD_NO -4
+#define UNLOCK_WRONG_PIN -7
+#define UNLOCK_REQUEST_PIN 10102
+#define UNLOCK_UNBLOCKED_CARD -6
+#define LISTSOLD_SUCCESSFUL 12
+#define GET_MONEY_NOT_MULTIPLE -9                                                  
+#define GET_MONEY_SUMM_TOO_LARGE -8 
+#define GET_MONEY_SUCCESSFUL 1231
 
 
 #define LOGOUT_INVALID_USER -1
@@ -526,6 +579,7 @@ int main(int argc, char ** argv)
 						 */
 						write_log(message);
 						fputs(message,stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_NOT_MULTIPLE:
@@ -533,6 +587,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -9 : Suma nu e multiplu de 10\n";
 						write_log(message);
 						fputs(message, stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_SUMM_TOO_LARGE:
@@ -540,6 +595,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -8 : Fonduri insuficiente\n";
 						write_log(message);
 						fputs(message, stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_SUCCESSFUL:
@@ -547,11 +603,19 @@ int main(int argc, char ** argv)
 						char message[BUFLEN];
 						memset(message, 0, BUFLEN);
 						sprintf(message, "ATM> Suma ");
-						memset(buffer, 0, BUFLEN);
-						strcat(message, buffer);
 						strcat(message, " retrasa cu succes\n");
 						write_log(message);
 						fputs(message, stdout);
+						memset(buffer, 0, BUFLEN);
+						break;
+					}
+					case PUT_MONEY_SUCCESSFUL:
+					{
+						char message[] = "Suma depusa cu succes\n";
+						write_log(message);
+						fputs(message, stdout);
+						memset(message, 0, BUFLEN);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case DEFAULT_CMD:
