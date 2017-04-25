@@ -14,8 +14,6 @@
 using namespace std;
 
 #define BUFLEN 255
-
-
 /*
  * Responses
  */
@@ -23,13 +21,18 @@ using namespace std;
 #define LOGIN_BRUTE_FORCE -5
 #define ALREADY_LOGGED_IN -2
 #define NOT_LOGGED_IN -10
-
+/*
+ * Commands
+ */
 #define QUIT_CMD 10
 #define DEFAULT_CMD 1
 #define UPLOAD_CMD 2
 #define LOGIN_CMD 11
 #define UNLOCK_CMD 8
 #define LISTSOLD_CMD 9
+/*
+ * Command responses
+ */
 #define CARD_NO_INEXISTENT -4
 #define WRONG_PIN -3
 #define UNLOCK_ERROR 101
@@ -43,26 +46,12 @@ using namespace std;
 #define GET_MONEY_SUMM_TOO_LARGE -8 
 #define GET_MONEY_SUCCESSFUL 1231
 #define PUT_MONEY_SUCCESSFUL 1232
-
-
 #define LOGOUT_INVALID_USER -1
 #define LOGOUT_SUCCESSFUL 1001
 #define UNKNOWN_USER -11
 
 #define LOGGED_IN 1
 #define LOGGED_OUT 0
-#include <iostream>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <string.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 using namespace std;
 
@@ -402,6 +391,7 @@ int main(int argc, char ** argv)
 							 */
 							char message[] = "UNLOCK> Trimite parola secreta\n>";
 							char pin[BUFLEN];
+							memset(pin, 0, BUFLEN);
 							fputs(message, stdout);
 							write_log(message);
 							/*
