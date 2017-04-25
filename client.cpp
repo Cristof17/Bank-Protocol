@@ -1,3 +1,4 @@
+//Rotsching Cristofor 343C1
 #include <iostream>
 #include <errno.h>
 #include <stdio.h>
@@ -227,11 +228,9 @@ int main(int argc, char ** argv)
 
 	memset(&receive_addr_udp, 0, sizeof(receive_addr_udp));
 
-
 	/*
 	 * Connect to server
 	 */ 
-
 	int size = sizeof(server_addr_tcp);
 	result = connect(sockfd, (struct sockaddr *) &server_addr_tcp, size);
 	if (result < 0) {

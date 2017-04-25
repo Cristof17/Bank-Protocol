@@ -1,0 +1,34 @@
+Rotsching Cristofor 343C1
+
+Server:
+	La pornire este citit fisierul de intrare, iar campurile sunt introduse
+	intr-un array de structuri user_t. Pe langa campurile din fisier se afla
+	informatii de control pentru fiecare utilizator precum numarul de login 
+	attemps nereusite, sau fd-ul pe care acesta este conectat;
+
+	Implementarea fiecarei comenzi functioneaza in felul urmator:
+	login->daca utilizatorul este autentificat cu succes, este salvat fd-ulo 
+	pe care s-a realizat cererea în structura din array-ul de structuri user
+	specific card_no primit ca argument al comenzii login. In cazul in care 
+	un fd este specificat in momentul in care se incerca salvarea noului fd 
+	(fd curent != -1) atunci inseamna ca exista o sesiune deschisa pe un alt fd.
+	Serverul mai verifica de asemenea si daca numarul de incercari de login a 
+	fost atins, caz in care se returneaza mesaj de tip BRUTE_FORCE
+
+	getmoney, putmoney, listsold executa niste parsari pentru a transforma din
+	char * in double, apoi se executa operatiile respective pe campul balance
+	din structura user_t. 
+
+	Pentru comanda de unlock, am implementat un array de long-uri, reprezentand
+	array-ul de card_no blocate. Astfel în momentul in care este detectat brute
+	force, card_no pe care s-a realizat brute-force este salvat in array-ul 
+	blocked_cards. In momentul in care este realizat unlock, card_no-ul pentru care
+	s-a realizat unlock este înlocuit cu -1. 
+
+Client:
+	Pentru client operatia de login, odata citita de la stdin este parsata, si
+	ii sunt extrase campurile card-no si pin.
+	Logarea comenzii se intampla in momentul in care s-a primit raspuns de la sv.
+	Pana atunci, ea este salvata in variabila last_command.
+	Operatiile de getmoney, putmoney, listsold doar fac schimb de mesaje cu
+	serverul pentru a extracta campul balance din structura user_t de pe server.
