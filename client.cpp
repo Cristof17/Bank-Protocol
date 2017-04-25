@@ -369,20 +369,23 @@ int main(int argc, char ** argv)
 									char message[] = "UNLOCK> Client deblocat\n";
 									write_log(message);
 									fputs(message, stdout);
+									memset(buffer, 0, BUFLEN);
 									break;
 								}
 								case UNLOCK_WRONG_PIN:
 								{
-									char message[] = "UNLOCK> -7 : Deblocare esuata";
+									char message[] = "UNLOCK> -7 : Deblocare esuata\n";
 									write_log(message);
 									fputs(message, stdout);
+									memset(buffer, 0, BUFLEN);
 									break;
 								}
 								case UNLOCK_ERROR:
 								{
-									char message[] = "UNLOCK> -6 : Operatie esuata";
+									char message[] = "UNLOCK> -6 : Operatie esuata\n";
 									write_log(message);
 									fputs(message, stdout);
+									memset(buffer, 0, BUFLEN);
 									break;
 								}
 							}
@@ -396,6 +399,7 @@ int main(int argc, char ** argv)
 							char message[] = "UNLOCK> -6 : Operatie esuata\n";
 							write_log(message);
 							fputs(message, stdout);
+							memset(buffer, 0, BUFLEN);
 							break;
 						}
 					}
@@ -483,11 +487,12 @@ int main(int argc, char ** argv)
 						memset(card_no, 0, BUFLEN);
 						memset(pin, 0, BUFLEN);
 						logged_in = LOGGED_OUT;
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case NOT_LOGGED_IN:
 					{
-						char message[] = "ATM> -11 : Utilizator inexistent";
+						char message[] = "ATM> -11 : Utilizator inexistent\n";
 						fputs(message, stdout);
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
@@ -495,7 +500,8 @@ int main(int argc, char ** argv)
 					}
 					case CARD_NO_INEXISTENT:
 					{
-						char message[] = "ATM> -4 : Numar card inexistent";
+						char message[] = "ATM> -4 : Numar card inexistent\n";
+						fputs(message, stdout);;
 						write_log(message);
 						fputs(message, stdout);
 						memset(buffer, 0, BUFLEN);
@@ -503,7 +509,8 @@ int main(int argc, char ** argv)
 					}
 					case WRONG_PIN:
 					{
-						char message[] = "ATM> -3 : Pin gresit";
+						char message[] = "ATM> -3 : Pin gresit\n";
+						fputs(message, stdout);
 						write_log(message);
 						fputs(message, stdout);
 						memset(buffer, 0, BUFLEN);
@@ -529,6 +536,7 @@ int main(int argc, char ** argv)
 						 */
 						write_log(message);
 						fputs(message,stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_NOT_MULTIPLE:
@@ -536,6 +544,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -9 : Suma nu e multiplu de 10\n";
 						write_log(message);
 						fputs(message, stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_SUMM_TOO_LARGE:
@@ -543,6 +552,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -8 : Fonduri insuficiente\n";
 						write_log(message);
 						fputs(message, stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_SUCCESSFUL:
@@ -550,13 +560,10 @@ int main(int argc, char ** argv)
 						char message[BUFLEN];
 						memset(message, 0, BUFLEN);
 						sprintf(message, "ATM> Suma ");
-						memset(buffer, 0, BUFLEN);
-						recv(i, buffer, BUFLEN, 0);
-						strcat(message, buffer);
 						strcat(message, " retrasa cu succes\n");
 						write_log(message);
 						fputs(message, stdout);
-						memset(message, 0, BUFLEN);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case PUT_MONEY_SUCCESSFUL:
@@ -565,6 +572,7 @@ int main(int argc, char ** argv)
 						write_log(message);
 						fputs(message, stdout);
 						memset(message, 0, BUFLEN);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case DEFAULT_CMD:

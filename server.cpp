@@ -1,3 +1,4 @@
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +44,9 @@
 #define UNLOCK_INEXISTENT_CARD_NO -4
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
-#define UNLOCK_UNBLOCKED_CARD -6
+#define UNLOCK_BLOKED 1
+#define UNLOCK_UNBLOCKED 0
+#define UNLOCK_UNBLOCKED_RESPONSE -6
 #define LISTSOLD_SUCCESSFUL 12
 #define GET_MONEY_NOT_MULTIPLE -9
 #define GET_MONEY_SUMM_TOO_LARGE -8
@@ -197,7 +200,9 @@ int unlock(long card_no, char *password){
 			for (j = 0; j < user_count; ++j){
 				if (users[j]->card_no == card_no){
 					if (strcmp(users[j]->password, password_tok) == 0){
+						users[j]->login_attempts = 0;
 						blocked_cards[i] = -1;
+						blocked_cards_no --;
 						printf("UNBLOCK_SUCCESSFUL\n");
 						return UNLOCK_SUCCESSFUL;
 					} else {
@@ -208,7 +213,23 @@ int unlock(long card_no, char *password){
 			}
 		}
 	}
-	return UNLOCK_ERROR;
+	return UNLOCK_UNBLOCKED_RESPONSE;
+}
+
+int is_blocked(char *card_no){
+	/*
+	 * Debug
+	 */
+	int i = 0;
+	for (i = 0; i < blocked_cards_no; ++i){
+		printf("Blocked cards[%d] = %d\n", i, blocked_cards[i]);
+	}
+	for (i = 0; i < blocked_cards_no; ++i){
+		if (blocked_cards[i] == atol(card_no)){
+			return UNLOCK_BLOKED;
+		}
+	}
+	return UNLOCK_UNBLOCKED;
 }
 
 int get_command_code(char *command)
@@ -312,7 +333,8 @@ int logout(int user_connection)
 	user->logged_in = LOGGED_OUT;
 	printf("User logged in = %d\n", user->logged_in);
 	user->login_attempts = 0;
-	return LOGOUT_SUCCESSFUL;
+	user->fd = -1;
+	 return LOGOUT_SUCCESSFUL;
 }
 void send_client_code(int fd, int code)
 {
@@ -340,35 +362,33 @@ void send_client_message(int fd, char *message)
 	send(fd, buf, BUFLEN, 0);
 }
 
-user_t *get_user_by_fd(int fd){
+int get_user_pos_by_fd(int fd){
 	int i = 0;
-	int count = get_users_from_file_count();
-	for (i = 0; i < count; ++i){
-		if (users[i] != NULL){
-			if (users[i]->fd == fd){
-				return users[i];
-			}
+	for (i = 0; i < user_count; ++i){
+		if (users[i]->fd == fd){
+			return i;
 		}
 	}
-	printf("returnez NULL\n");
-	return NULL;
+	return -1;
 }
 
 int substract_from_balance(int fd, long summ){
 	/*
 	 * Get the user for the given fd
 	 */
-	user_t *user = get_user_by_fd(fd); 
-	if (user == NULL){
+	int pos = get_user_pos_by_fd(fd);
+	if (pos == -1)
+		return NOT_LOGGED_IN;
+	if (users[pos] == NULL){
 		return NOT_LOGGED_IN;
 	}
 	if (summ % 10 != 0){
 		return GET_MONEY_NOT_MULTIPLE;
 	}
-	if (summ > user->balance){
+	if (summ > users[pos]->balance){
 		return GET_MONEY_SUMM_TOO_LARGE;
 	}
-	user->balance = user->balance - summ;
+	users[pos]->balance = users[pos]->balance - summ;
 	return GET_MONEY_SUCCESSFUL;
 }
 
@@ -376,11 +396,12 @@ int put_summ_in_balance(int fd, long summ){
 	/*
 	 * Get the user for the given fd
 	 */
-	user_t *user = get_user_by_fd(fd);
-	if (user == NULL)
+	int pos = get_user_pos_by_fd(fd);
+	if (pos == -1)
+			return NOT_LOGGED_IN;
+	if (users[pos] == NULL)
 		return NOT_LOGGED_IN;
-	user->balance += summ;
-	printf("user has %s\n", user->balance);
+	users[pos]->balance += summ;
 	return PUT_MONEY_SUCCESSFUL;
 }
 
@@ -443,7 +464,7 @@ void get_users_from_file(user_t **out)
 		);
 		user_count++;
 	 }
-	 printf("Finished reading users from file \n");
+	 printf("Finished reading users from file user_count = %d \n", user_count);
 }
 
 
@@ -459,19 +480,17 @@ void create_users()
 	get_users_from_file(users);
 }
 
-user_t *get_user_by_name(char *name)
+int get_user_pos_by_name(char *name)
 {
 	int users_count = get_users_from_file_count();
-	if (name == NULL)
-		return NULL;
 	for (int i = 0; i < users_count; ++i) {
 		if (users[i] == NULL)
 			continue;
 		if (strcmp(users[i]->name, name) == 0){
-			return users[i];
+			return i;
 		}
 	}
-	return NULL;
+	return -1;
 }
 
 void get_unlock_credentials(char *command, long *card_no, char *password)
@@ -629,7 +648,6 @@ int main(int argc, char ** argv)
 	 */
 	if (users == NULL)
 		users = (user_t **)malloc(MAX_USERS * sizeof(user_t *));
-	get_users_from_file(users);
 	
 	/*
 	 * Listen for incoming connections
@@ -684,6 +702,12 @@ int main(int argc, char ** argv)
 						if (check_unlock_card_no(card_no) == CARD_NO_EXISTS){
 							//send UNLOCK_PASS_REQEUST
 							printf("Trimit pe UDP cod de pin\n");
+							if (!is_blocked(card_no)){
+								printf("Card is not blocked");
+								send_udp_client_code((struct sockaddr*)&client_addr_udp,
+													unlock_sock, UNLOCK_UNBLOCKED_RESPONSE);
+								continue;
+							}
 							send_udp_client_code((struct sockaddr*) &client_addr_udp,
 												unlock_sock, UNLOCK_REQUEST_PIN);
 							//use recvfrom to ge the card_no and pass
@@ -720,9 +744,14 @@ int main(int argc, char ** argv)
 																UNLOCK_WRONG_PIN);
 									break;
 								}
+								case UNLOCK_UNBLOCKED_RESPONSE:
+									send_udp_client_code((struct sockaddr *)&client_addr_udp, unlock_sock,
+																		UNLOCK_UNBLOCKED_RESPONSE);
+									break;
 								default:
 								{
 									printf("UNLOCK default error code\n");
+									send_client_code(i, UNLOCK_ERROR);
 									break;
 								}
 							}
@@ -878,7 +907,9 @@ int main(int argc, char ** argv)
 							{
 								printf("List sold received\n");
 								char message[BUFLEN];
-								user_t *curr_user = get_user_by_fd(i);
+								user_t *curr_user;
+								int curr_user_pos = get_user_pos_by_fd(i);
+								curr_user = users[curr_user_pos];
 								if (curr_user != NULL){
 									memset(message, 0, BUFLEN);
 									sprintf(message, "%.2lf", curr_user->balance);
@@ -899,9 +930,14 @@ int main(int argc, char ** argv)
 								memset(payload, 0, BUFLEN);
 								char *tok = strtok(NULL, " \n\t");
 								sscanf(tok, "%lf\n", &summ); 
+								 
 								/*
 								 * Substract summ ang get error code
 								 */
+								int j =0;
+								for (j = 0; j < user_count; ++j){
+									printf("User %s logged in on %d\n", users[j]->name, users[j]->fd);
+								}
 								result = substract_from_balance(i, (long)summ);
 								switch (result){
 									case NOT_LOGGED_IN:
@@ -922,12 +958,6 @@ int main(int argc, char ** argv)
 									case GET_MONEY_SUCCESSFUL:
 									{
 										send_client_code(i, GET_MONEY_SUCCESSFUL);
-										/*
-										 * Send the summ extracted to print it
-										 */
-										memset(buffer, 0, BUFLEN);
-										sprintf(buffer, "%lf", summ);
-										send(i, buffer, BUFLEN, 0);
 										break;
 									}
 								}
@@ -963,6 +993,7 @@ int main(int argc, char ** argv)
 							}
 							case QUIT_CMD:
 							{
+
 								close (server_sock);
 								exit(0);
 								break;
