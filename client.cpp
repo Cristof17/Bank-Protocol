@@ -583,5 +583,7 @@ int main(int argc, char ** argv)
 	fclose(client_file);
 	close(client_file_fd);
 
+	return 0;
+
 }
 
