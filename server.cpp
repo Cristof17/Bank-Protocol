@@ -878,6 +878,14 @@ int main(int argc, char ** argv)
 								char message[BUFLEN];
 								user_t *curr_user;
 								int curr_user_pos = get_user_pos_by_fd(i);
+								printf("current user pos = %d\n", curr_user_pos);
+								/*
+								 * There is no logged in user
+								 */ 
+								if (curr_user_pos == -1){
+									send_client_code(i, NOT_LOGGED_IN);
+									break;
+								}
 								curr_user = users[curr_user_pos];
 								if (curr_user != NULL){
 									memset(message, 0, BUFLEN);
@@ -899,14 +907,6 @@ int main(int argc, char ** argv)
 								memset(payload, 0, BUFLEN);
 								char *tok = strtok(NULL, " \n\t");
 								sscanf(tok, "%lf\n", &summ); 
-								 
-								/*
-								 * Substract summ ang get error code
-								 */
-								int j =0;
-								for (j = 0; j < user_count; ++j){
-									printf("User %s logged in on %d\n", users[j]->name, users[j]->fd);
-								}
 								result = substract_from_balance(i, (long)summ);
 								switch (result){
 									case NOT_LOGGED_IN:

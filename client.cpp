@@ -361,8 +361,10 @@ int main(int argc, char ** argv)
 					strcat(buffer, card_no);
 					/*
 					 * Save command for when the response gets back
+					 * Append newline for log message
 					 */
 					save_command(last_command, buffer);	
+					strcat(last_command, "\n");
 					//send_to on udp sock	et
 					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
 					sendto(unlock_fd, buffer, BUFLEN, 0,
@@ -635,7 +637,9 @@ int main(int argc, char ** argv)
 					}
 					case DEFAULT_CMD:
 					{
-						printf("Command not recognized\n");
+						char message[] = "Command not recognized\n";
+						fputs(message, stdout);
+						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
