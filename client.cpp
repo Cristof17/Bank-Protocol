@@ -134,6 +134,8 @@ int fdmax;
 fd_set original;
 fd_set modified;
 
+char last_command[BUFLEN];
+
 
 int get_command_code(char *command)
 {
@@ -220,6 +222,11 @@ void get_unlock_response_code(char *buffer, char *code){
 void write_log(char *buff)
 {
 	write(client_file_fd, buff, strlen(buff));		
+}
+
+void save_command(char *command, char *curr){
+	memset(command, 0, BUFLEN);
+	strcpy(command, curr);
 }
 
 int main(int argc, char ** argv)
@@ -326,6 +333,7 @@ int main(int argc, char ** argv)
 			 */
 			if (i == STDIN_FILENO && FD_ISSET(i, &modified)) {
 				read(STDIN_FILENO, buffer, BUFLEN);
+
 				if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
 					printf("Buffer is empty\n");
 					memset(buffer, 0 , BUFLEN);
@@ -341,22 +349,31 @@ int main(int argc, char ** argv)
 					 */
 					send(sockfd, buffer, BUFLEN, 0);
 					/*
+					 * Write in log file without saving
+					 */
+					write_log(buffer);
+					/*
 					 * Close local connection
 					 */
 					close(sockfd);
 					exit(0);
 				}
-				if (get_command_code(buffer) == LOGIN_CMD){
+				else if (get_command_code(buffer) == LOGIN_CMD){
 					//get the credentials so that unlock
 					//would know what user is going to connect
 					get_login_credentials(buffer, card_no, pin);
 					printf("Login credentials = %s %s\n", card_no, pin);
+					save_command(last_command, buffer);
 					char command[BUFLEN];
 				}
-				if (get_command_code(buffer) == UNLOCK_CMD){
+				else if (get_command_code(buffer) == UNLOCK_CMD){
 					//put " " instead of \n
 					buffer[strlen(buffer) -1] =' ';	
 					strcat(buffer, card_no);
+					/*
+					 * Save command for when the response gets back
+					 */
+					save_command(last_command, buffer);	
 					//send_to on udp sock	et
 					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
 					sendto(unlock_fd, buffer, BUFLEN, 0,
@@ -372,6 +389,11 @@ int main(int argc, char ** argv)
 					char code[BUFLEN];
 					memset(code, 0, BUFLEN);
 					get_unlock_response_code(buffer, code);
+					/*
+					 * Before reading the response codes
+					 * log the command in the file
+					 */
+					write_log(last_command);
 					switch (atoi(code)){
 						case UNLOCK_REQUEST_PIN:
 						{
@@ -469,14 +491,10 @@ int main(int argc, char ** argv)
 			}
 
 			else if (i == unlock_fd && FD_ISSET(i, &modified)) {
-				printf("Am ceva pe UDP În client\n");
 				memset(buffer, 0, BUFLEN);
 				socklen_t struct_size =(socklen_t)sizeof(receive_addr_udp);
 				recvfrom(unlock_fd, buffer, BUFLEN, 0,
 						(struct sockaddr *)&receive_addr_udp, &struct_size);
-				printf("Am primit raspuns pe udp %s\n", buffer);
-				//check the response
-
 			}
 			
 			else if (i == sockfd && FD_ISSET(i, &modified)) {
@@ -491,9 +509,10 @@ int main(int argc, char ** argv)
 				}
 				memset(buffer, 0, BUFLEN);
 				result = recv(sockfd, buffer, BUFLEN, 0);
-				printf("Received %d bytes\n", result);
-				printf("Received = %s on %d\n", buffer, i);
-				printf("Atoi(buffer) = %d\n", atoi(buffer));
+				/*
+				 * Log the last response
+				 */
+				write_log(last_command);
 				switch (atoi(buffer)) {
 					case SUCCESS:
 					{
