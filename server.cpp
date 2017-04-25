@@ -208,13 +208,8 @@ int unlock(long card_no, char *password){
 }
 
 int is_blocked(char *card_no){
-	/*
-	 * Debug
-	 */
+
 	int i = 0;
-	for (i = 0; i < blocked_cards_no; ++i){
-		printf("Blocked cards[%d] = %d\n", i, blocked_cards[i]);
-	}
 	for (i = 0; i < blocked_cards_no; ++i){
 		if (blocked_cards[i] == atol(card_no)){
 			return UNLOCK_BLOKED;
@@ -311,7 +306,6 @@ int logout(int user_connection)
 				user = users[i];
 		}
 	}
-	printf("user name = %s and logged_in = %d\n", user->name, user->logged_in);
 	if (user == NULL)
 		return LOGOUT_INVALID_USER;
 	if (user->logged_in == LOGGED_OUT){
