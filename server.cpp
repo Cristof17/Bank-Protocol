@@ -42,7 +42,7 @@
 #define UNLOCK_INEXISTENT_CARD_NO -4
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
-#define UNLOCK_BLOKED 1
+#define UNLOCK_BLOCKED 1
 #define UNLOCK_UNBLOCKED 0
 #define UNLOCK_UNBLOCKED_RESPONSE -6
 #define LISTSOLD_SUCCESSFUL 12
@@ -699,8 +699,10 @@ int main(int argc, char ** argv)
 						 * Check if the card_no exists
 						 */
 						if (check_unlock_card_no(card_no) == CARD_NO_EXISTS){
+
 							/*
-							 * 
+							 * if the card is not blocked then send back unblocked 
+							 * cannot be carried out message
 							 */
 							if (is_not_blocked(card_no)){
 								printf("Card is not blocked");
@@ -708,6 +710,10 @@ int main(int argc, char ** argv)
 													unlock_sock, UNLOCK_UNBLOCKED_RESPONSE);
 								continue;
 							}
+
+							/*
+							 * Request the pin for the given card_no
+							 */
 							send_udp_client_code((struct sockaddr*) &client_addr_udp,
 												unlock_sock, UNLOCK_REQUEST_PIN);
 							//use recvfrom to ge the card_no and pass
@@ -717,25 +723,24 @@ int main(int argc, char ** argv)
 							if (result < 0){
 								perror("Did not receive on UDP socket");
 								continue;
-							} 								//parse card_no and pin
+							}
+							
+							//parse card_no and pin
 							long card_no = 0;
 							char password[BUFLEN];
 							get_unlock_credentials(buffer, &card_no, password);
-							printf("Received unlock credentials %ld %s \n", card_no, password);
 							result = unlock(card_no, password);
 							switch(result) {
 								case UNLOCK_SUCCESSFUL:
 								{
 									send_udp_client_code((struct sockaddr*)&client_addr_udp, unlock_sock,
 																		UNLOCK_SUCCESSFUL);
-									printf("Sending unlock successful %d\n", UNLOCK_SUCCESSFUL);
 									break;
 								}
 								case UNLOCK_ERROR:
 								{
 									send_udp_client_code((struct sockaddr*)&client_addr_udp, unlock_sock,
 																	UNLOCK_ERROR);
-									printf("Sending unlock error %d\n", UNLOCK_ERROR);
 									break;
 								}
 								case UNLOCK_WRONG_PIN:
@@ -750,7 +755,6 @@ int main(int argc, char ** argv)
 									break;
 								default:
 								{
-									printf("UNLOCK default error code\n");
 									send_client_code(i, UNLOCK_ERROR);
 									break;
 								}
@@ -760,7 +764,6 @@ int main(int argc, char ** argv)
 							//send -4 message
 							send_udp_client_code((struct sockaddr*)&client_addr_udp,
 												unlock_sock, UNLOCK_INEXISTENT_CARD_NO);
-							printf("Am trimis pe UDP -5\n");
 						}
 						break;
 					}
@@ -775,8 +778,7 @@ int main(int argc, char ** argv)
 					switch (result) {
 						case QUIT_CMD:
 						{
-							close (server_sock);
-							exit(0);
+							goto RELEASE;
 							break;
 						}
 						default:
@@ -798,35 +800,39 @@ int main(int argc, char ** argv)
 							perror("ERROR in recv");
 						}
 						close(i); 
-						FD_CLR(i, &original); // scoatem din multimea de citire socketul pe care 
+						FD_CLR(i, &original);
 					} 
 					
-					else { //recv intoarce >0
-						printf ("\nAm primit de la clientul de pe socketul %d, mesajul: %s", i, buffer);
+					else {
 						char *command = strtok(buffer, " \n");
-						printf("command = %s\n", command);
 						int code = get_command_code(command);
 						int user_fd = 0;
 						switch (code) {
 							case LOGIN_CMD:
 							{
+								/*
+								 * preapare the arguments for the login function
+								 * passed as a struct
+								 */
 								login_params_t params;
-								long card_no;
-								int pin;
+								long card_no = 0;
+								int pin = 0;
 								memset(&params, 0, sizeof(login_params_t));
 								char *tok = strtok(NULL, " \t\n");
-								printf("Tok = %s\n", tok);
 								if (tok != NULL){
 									card_no = atol(tok);
 									params.card_no = card_no;
 									tok = strtok(NULL, " \t\n");
-									printf("Tok = %s\n", tok);
 									if (tok != NULL){
 										pin = atoi(tok);
 										params.pin = pin;
 									}
 								}
-								printf("Login params = %ld %d\n", params.card_no, params.pin);
+								/*
+								 * Login the user
+								 * Check if it is already logged in from a
+								 * different fd
+								 */
 								result = login(&params, &user_fd);
 								switch (result) {
 									case SUCCESS:
@@ -853,7 +859,7 @@ int main(int argc, char ** argv)
 
 									case ALREADY_LOGGED_IN:
 									{
-										printf("-2 Sesiune deja deschisa \n");
+										printf("%d Sesiune deja deschisa \n", ALREADY_LOGGED_IN);
 										send_client_code(i, ALREADY_LOGGED_IN);
 										break;
 									}
@@ -867,12 +873,12 @@ int main(int argc, char ** argv)
 									}
 									case WRONG_PIN:
 									{
-										printf("%d -3 Pin Gresit\n", WRONG_PIN);
+										printf("%d Pin Gresit\n", WRONG_PIN);
 										send_client_code(i, WRONG_PIN);
 										break;
 									}
 									default:
-										printf("%d -4 Card no not existent\n", CARD_NO_INEXISTENT);
+										printf("%d Card no not existent\n", CARD_NO_INEXISTENT);
 										send_client_code(i, CARD_NO_INEXISTENT);
 										break;
 								}
@@ -887,13 +893,13 @@ int main(int argc, char ** argv)
 								 switch(result) {
 									case LOGOUT_INVALID_USER:
 									{
-										printf("-1 Clientul nu este autentificat");
+										printf("%d Clientul nu este autentificat", LOGOUT_INVALID_USER);
 										send_client_code(i, LOGOUT_INVALID_USER);
 										break;
 									}
 									case LOGOUT_SUCCESSFUL:
 									{
-										printf("Logout successfull\n");
+										printf("%d Logout successfull\n", LOGOUT_SUCCESSFUL);
 										send_client_code(i, LOGOUT_SUCCESSFUL);
 										break;
 									}
@@ -904,11 +910,9 @@ int main(int argc, char ** argv)
 							}
 							case LISTSOLD_CMD:
 							{
-								printf("List sold received\n");
 								char message[BUFLEN];
 								user_t *curr_user;
 								int curr_user_pos = get_user_pos_by_fd(i);
-								printf("current user pos = %d\n", curr_user_pos);
 								/*
 								 * There is no logged in user
 								 */ 
@@ -916,6 +920,9 @@ int main(int argc, char ** argv)
 									send_client_code(i, NOT_LOGGED_IN);
 									break;
 								}
+								/*
+								 * get the user for which the sold is requested
+								 */
 								curr_user = users[curr_user_pos];
 								if (curr_user != NULL){
 									memset(message, 0, BUFLEN);
@@ -1013,6 +1020,7 @@ int main(int argc, char ** argv)
 	/*
 	 * Closing remarks
 	 */
+	RELEASE:
 	close(server_sock);
 	close(unlock_sock);
 	return 0;	
