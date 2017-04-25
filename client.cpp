@@ -52,47 +52,6 @@ using namespace std;
 
 #define LOGGED_IN 1
 #define LOGGED_OUT 0
-
-using namespace std;
-
-#define BUFLEN 255
-
-
-/*
- * Responses
- */
-#define SUCCESS 100000
-#define LOGIN_BRUTE_FORCE -5
-#define ALREADY_LOGGED_IN -2
-#define NOT_LOGGED_IN -10
-
-#define QUIT_CMD 10
-#define DEFAULT_CMD 1
-#define UPLOAD_CMD 2
-#define LOGIN_CMD 11
-#define UNLOCK_CMD 8
-#define LISTSOLD_CMD 9
-#define CARD_NO_INEXISTENT -4
-#define WRONG_PIN -3
-#define UNLOCK_ERROR 101
-#define UNLOCK_SUCCESSFUL 102
-#define UNLOCK_INEXISTENT_CARD_NO -4
-#define UNLOCK_WRONG_PIN -7
-#define UNLOCK_REQUEST_PIN 10102
-#define UNLOCK_UNBLOCKED_CARD -6
-#define LISTSOLD_SUCCESSFUL 12
-#define GET_MONEY_NOT_MULTIPLE -9                                                  
-#define GET_MONEY_SUMM_TOO_LARGE -8 
-#define GET_MONEY_SUCCESSFUL 1231
-
-
-#define LOGOUT_INVALID_USER -1
-#define LOGOUT_SUCCESSFUL 1001
-#define UNKNOWN_USER -11
-
-#define LOGGED_IN 1
-#define LOGGED_OUT 0
-
 /*
  * All about server socket
  */
@@ -323,8 +282,10 @@ int main(int argc, char ** argv)
 			if (i == STDIN_FILENO && FD_ISSET(i, &modified)) {
 				read(STDIN_FILENO, buffer, BUFLEN);
 
+				/*
+				 * Check if buffer is empty
+				 */
 				if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
-					printf("Buffer is empty\n");
 					memset(buffer, 0 , BUFLEN);
 					continue;
 				}
@@ -351,9 +312,11 @@ int main(int argc, char ** argv)
 					//get the credentials so that unlock
 					//would know what user is going to connect
 					get_login_credentials(buffer, card_no, pin);
-					printf("Login credentials = %s %s\n", card_no, pin);
+					/*
+					 * Save the command to write it in the log as
+					 * soon as the response comes
+					 */
 					save_command(last_command, buffer);
-					char command[BUFLEN];
 				}
 				else if (get_command_code(buffer) == UNLOCK_CMD){
 					//put " " instead of \n
@@ -365,7 +328,7 @@ int main(int argc, char ** argv)
 					 */
 					save_command(last_command, buffer);	
 					strcat(last_command, "\n");
-					//send_to on udp sock	et
+					//send_to on udp socket
 					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
 					sendto(unlock_fd, buffer, BUFLEN, 0,
 						(struct sockaddr *)&server_addr_udp, sock_size); 
@@ -508,11 +471,16 @@ int main(int argc, char ** argv)
 				switch (atoi(buffer)) {
 					case SUCCESS:
 					{
-						printf("Login successful \n");
 						/*
 						 * Get username from server for prompt
 						 */
-						char message[] = "ATM> Login successful\n";
+						char name[BUFLEN];
+						memset(name, 0, BUFLEN);
+						recv(i, name, BUFLEN, 0);
+						char message[] = "ATM> Welcome ";
+						strcat(message, name);
+						strcat(message, "\n");
+						fputs(message, stdout);
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						logged_in = LOGGED_IN;

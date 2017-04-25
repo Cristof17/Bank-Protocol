@@ -545,7 +545,7 @@ int main(int argc, char ** argv)
 	 * Open TCP socket
 	 */
 	server_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_sock == 0) {
+	if (server_sock < 0) {
 		perror("Cannot open first socket \n");
 		exit(1);
 	}
@@ -749,7 +749,7 @@ int main(int argc, char ** argv)
 						}
 						break;
 					}
-				} else if (i == STDIN_FILENO) {
+				} else if (i == STDIN_FILENO && FD_ISSET(i, &modified)) {
 					char buffer[BUFLEN];
 					memset(buffer, 0, BUFLEN);
 					fgets(buffer, BUFLEN, stdin);
@@ -818,6 +818,21 @@ int main(int argc, char ** argv)
 									{	
 										send_client_code(i, SUCCESS); 
 										set_fd_for_card_no(card_no, i);
+										int user_pos = get_user_pos_by_fd(i);
+										if (user_pos == -1)
+											/*
+											 * Very unlikely to happen
+											 */
+											 break;
+										/*
+										 * Send freshly logged in user the name registered with
+										 * the card_no 
+										 */
+										char login_name[BUFLEN];
+										memset(login_name, 0, BUFLEN);
+										sprintf(login_name, "%s %s", users[user_pos]->name,
+																								users[user_pos]->surname);
+										send(i, login_name, BUFLEN, 0);
 										break;
 									}
 
