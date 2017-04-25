@@ -409,7 +409,7 @@ int main(int argc, char ** argv)
 				 * Log the command
 				 */
 				write_log(buffer);
-				//memset(buffer, 0, BUFLEN);
+				memset(buffer, 0, BUFLEN);
 			}
 
 			else if (i == unlock_fd && FD_ISSET(i, &modified)) {
@@ -424,6 +424,7 @@ int main(int argc, char ** argv)
 			}
 			
 			else if (i == sockfd && FD_ISSET(i, &modified)) {
+				printf("am ceva in sockfd\n");
 				/*
 				 * If the buffer is empty, it means
 				 * I have not send any information and that
