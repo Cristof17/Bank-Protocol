@@ -426,7 +426,7 @@ int main(int argc, char ** argv)
 								}
 								case UNLOCK_WRONG_PIN:
 								{
-									char message[] = "UNLOCK> -7 : Deblocare esuata";
+									char message[] = "UNLOCK> -7 : Deblocare esuata\n";
 									write_log(message);
 									fputs(message, stdout);
 									memset(buffer, 0, BUFLEN);
@@ -434,7 +434,7 @@ int main(int argc, char ** argv)
 								}
 								case UNLOCK_ERROR:
 								{
-									char message[] = "UNLOCK> -6 : Operatie esuata";
+									char message[] = "UNLOCK> -6 : Operatie esuata\n";
 									write_log(message);
 									fputs(message, stdout);
 									memset(buffer, 0, BUFLEN);
@@ -543,24 +543,24 @@ int main(int argc, char ** argv)
 					}
 					case NOT_LOGGED_IN:
 					{
-						char message[] = "ATM> -11 : Utilizator inexistent";
-						printf("%s\n", message);
+						char message[] = "ATM> -11 : Utilizator inexistent\n";
+						fputs(message, stdout);
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case CARD_NO_INEXISTENT:
 					{
-						char message[] = "ATM> -4 : Numar card inexistent";
-						printf("%s\n", message);
+						char message[] = "ATM> -4 : Numar card inexistent\n";
+						fputs(message, stdout);;
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case WRONG_PIN:
 					{
-						char message[] = "ATM> -3 : Pin gresit";
-						printf("%s\n", message);
+						char message[] = "ATM> -3 : Pin gresit\n";
+						fputs(message, stdout);
 						write_log(message);
 						memset(buffer, 0, BUFLEN);
 						break;

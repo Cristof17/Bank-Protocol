@@ -44,8 +44,9 @@
 #define UNLOCK_INEXISTENT_CARD_NO -4
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
-#define UNLOCK_BLOKED_CARD 0
-#define UNLOCK_UNBLOCKED_CARD -6
+#define UNLOCK_BLOKED 1
+#define UNLOCK_UNBLOCKED 0
+#define UNLOCK_UNBLOCKED_RESPONSE -6
 #define LISTSOLD_SUCCESSFUL 12
 #define GET_MONEY_NOT_MULTIPLE -9
 #define GET_MONEY_SUMM_TOO_LARGE -8
@@ -190,7 +191,9 @@ int unlock(long card_no, char *password){
 			for (j = 0; j < user_count; ++j){
 				if (users[j]->card_no == card_no){
 					if (strcmp(users[j]->password, password_tok) == 0){
+						users[j]->login_attempts = 0;
 						blocked_cards[i] = -1;
+						blocked_cards_no --;
 						printf("UNBLOCK_SUCCESSFUL\n");
 						return UNLOCK_SUCCESSFUL;
 					} else {
@@ -201,17 +204,23 @@ int unlock(long card_no, char *password){
 			}
 		}
 	}
-	return UNLOCK_UNBLOCKED_CARD;
+	return UNLOCK_UNBLOCKED_RESPONSE;
 }
 
-int is_blocked(long card_no){
+int is_blocked(char *card_no){
+	/*
+	 * Debug
+	 */
 	int i = 0;
-	for (i = 0; i < blocked_card_no; ++i){
-		if (blocked_card[i] == card_no){
-			return UNLOCK_BLOKED_CARD;
+	for (i = 0; i < blocked_cards_no; ++i){
+		printf("Blocked cards[%d] = %d\n", i, blocked_cards[i]);
+	}
+	for (i = 0; i < blocked_cards_no; ++i){
+		if (blocked_cards[i] == atol(card_no)){
+			return UNLOCK_BLOKED;
 		}
 	}
-	return UNLOCK_UNBLOCKED_CARD;
+	return UNLOCK_UNBLOCKED;
 }
 
 int get_command_code(char *command)
@@ -684,6 +693,12 @@ int main(int argc, char ** argv)
 						if (check_unlock_card_no(card_no) == CARD_NO_EXISTS){
 							//send UNLOCK_PASS_REQEUST
 							printf("Trimit pe UDP cod de pin\n");
+							if (!is_blocked(card_no)){
+								printf("Card is not blocked");
+								send_udp_client_code((struct sockaddr*)&client_addr_udp,
+													unlock_sock, UNLOCK_UNBLOCKED_RESPONSE);
+								continue;
+							}
 							send_udp_client_code((struct sockaddr*) &client_addr_udp,
 												unlock_sock, UNLOCK_REQUEST_PIN);
 							//use recvfrom to ge the card_no and pass
@@ -720,9 +735,9 @@ int main(int argc, char ** argv)
 																UNLOCK_WRONG_PIN);
 									break;
 								}
-								case UNLOCK_UNBLOCKED_CARD:
-									send_udp_client_code((struct sockaddr *)&client_addr_udp, unlock_sockm
-																		UNLOCK_UNBLOCKED_CARD);
+								case UNLOCK_UNBLOCKED_RESPONSE:
+									send_udp_client_code((struct sockaddr *)&client_addr_udp, unlock_sock,
+																		UNLOCK_UNBLOCKED_RESPONSE);
 									break;
 								default:
 								{
