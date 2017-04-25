@@ -430,10 +430,10 @@ int main(int argc, char ** argv)
 				 * I have not send any information and that
 				 * what I received from stdin was empty
 				 */
-				//if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
-				//	memset(buffer, 0 , BUFLEN);
-				//	continue;
-				//}
+				if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
+					memset(buffer, 0 , BUFLEN);
+					continue;
+				}
 				memset(buffer, 0, BUFLEN);
 				result = recv(sockfd, buffer, BUFLEN, 0);
 				printf("Received %d bytes\n", result);
@@ -449,6 +449,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> Login successful\n";
 						write_log(message);
 						logged_in = LOGGED_IN;
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LOGIN_BRUTE_FORCE:
@@ -456,6 +457,7 @@ int main(int argc, char ** argv)
 						printf("ATM> -5 : Card blocat\n");
 						char message[] = "ATM> -5 : Card blocat\n";
 						write_log(message);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case ALREADY_LOGGED_IN:
@@ -463,6 +465,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -2 : Sesiune deja deschisa\n";
 						fputs(message, stdout);
 						write_log(message);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LOGOUT_INVALID_USER:
@@ -470,6 +473,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -1 : Clientul nu e autentificat\n";
 						fputs(message, stdout);
 						write_log(message);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LOGOUT_SUCCESSFUL:
@@ -486,6 +490,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -11 : Utilizator inexistent";
 						fputs(message, stdout);
 						write_log(message);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case CARD_NO_INEXISTENT:
@@ -493,6 +498,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -4 : Numar card inexistent";
 						write_log(message);
 						fputs(message, stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case WRONG_PIN:
@@ -500,6 +506,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -3 : Pin gresit";
 						write_log(message);
 						fputs(message, stdout);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LISTSOLD_SUCCESSFUL:
@@ -536,7 +543,6 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -8 : Fonduri insuficiente\n";
 						write_log(message);
 						fputs(message, stdout);
-						memset(message, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_SUCCESSFUL:
@@ -564,6 +570,7 @@ int main(int argc, char ** argv)
 					case DEFAULT_CMD:
 					{
 						printf("Command not recognized\n");
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					default:
@@ -571,12 +578,12 @@ int main(int argc, char ** argv)
 				}
 			}
 
-			else if (FD_ISSET(i, &modified)) {
+			else {
 				//result = read(sockfd, buffer, BUFLEN);
 				if (result <= 0) {
 					perror("Error when client receiving\n");
 				}
-				printf("Received %s from %d \n", buffer, i);
+				//printf("Received %s from %d \n", buffer, i);
 			}
 		}
 	}
