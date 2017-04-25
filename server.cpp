@@ -14,8 +14,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
-
-
 /*
  * Decoding instructions
  */
@@ -72,36 +70,40 @@
 
 using namespace std;
 
+/*
+ * Params used when calling login function
+ */
 typedef struct login_params {
 	long card_no;
 	int pin;
 } login_params_t;
 
-typedef struct file {
-	char filename[BUFLEN];
-	long size;
-	bool shared;
-} file_t;
-
+/*
+ * Basic building block for server
+ */
 typedef struct user{
+	/*
+	 * This is used when commands with no card_no or unique identification
+	 * atttribute come. This is the link between the remote terminal
+	 * and the user
+	 */
 	int fd;
 	char *name;
 	char *surname;
 	long card_no;
 	int pin;
 	char *password;
-	double balance;
-	int login_attempts;
-	int logged_in;
+	double balance;//summ of money
+	int login_attempts; //count the number of unsuccessful attemps
+	int logged_in; //check if the user is logged in 
 } user_t;
 
 int server_sock; //TCP Socket
 int unlock_sock ; //UDP Socket
-int client_sock;
 struct sockaddr_in server_addr_tcp;
 struct sockaddr_in server_addr_udp;
-struct sockaddr_in client_addr_udp;
-struct sockaddr_in client_addr;
+struct sockaddr_in client_addr_udp;//when making recvfrom
+struct sockaddr_in client_addr;//when accepting new connection
 
 /*
  * Result for any opperation for debug purposes
@@ -117,9 +119,6 @@ int result;
 
 
  FILE *user_file; 
- FILE *shared_file;
-
-
  /*
   * Login attempt monitor
   */
@@ -127,7 +126,6 @@ int login_attempt;
 
 user_t **users;
 int user_count;
-
 /*
  * These are for getting file information 
  * from folders because each user
@@ -138,14 +136,20 @@ int user_count;
 long *blocked_cards;
 int blocked_cards_no;
 
-//put the card_no in the array of blocked cards
+/*
+ * Basically this function puts the card that needs to be blocked
+ * into the array of blocked cards
+ */
 void block_card(login_params *params){
 	if (blocked_cards == NULL)
 		blocked_cards = (long *)calloc(200,sizeof(long));
 	blocked_cards[blocked_cards_no] = params->card_no;
 	blocked_cards_no ++;
 }
-
+/*
+ * Basically this checks if the card_no is found the blocked 
+ * card no array
+ */
 int check_unlock_card_no(char *card_no){
 	long card_no_long = 0;
 	int i = 0;
@@ -157,6 +161,10 @@ int check_unlock_card_no(char *card_no){
 	return CARD_NO_NOT_EXISTS;
 }
 
+/*
+ * Get the fd on which a user logged in using the card_fd received as
+ * parameter
+ */
 int get_fd_for_card_no(long card_no){
 	int i = 0;
 	for (i = 0; i < user_count; ++i){
@@ -169,7 +177,6 @@ int get_fd_for_card_no(long card_no){
 	return -1;
 }
 
-//to unblock a card you just need to set the value to -1 for a given cardno
 int unlock(long card_no, char *password){
 	int i = 0;
 	int j = 0;
@@ -182,8 +189,11 @@ int unlock(long card_no, char *password){
 	}
 	if (blocked_cards == NULL)
 		return UNLOCK_ERROR;
+	/*
+	 * Check if the card is in the blocked cards array
+	 */
 	for (i = 0; i < blocked_cards_no; ++i){
-		//check if the card is blocked
+		//check if the current card is blocked
 		if (blocked_cards[i] == card_no){
 			//iterate through the users to check
 			//if the pin is ok for the given card	
@@ -191,13 +201,15 @@ int unlock(long card_no, char *password){
 			for (j = 0; j < user_count; ++j){
 				if (users[j]->card_no == card_no){
 					if (strcmp(users[j]->password, password_tok) == 0){
+						//reset the number of attemps a user can
+						//try a password
 						users[j]->login_attempts = 0;
+						//set the card_no for in the blocked
+						//array as -1
 						blocked_cards[i] = -1;
 						blocked_cards_no --;
-						printf("UNBLOCK_SUCCESSFUL\n");
 						return UNLOCK_SUCCESSFUL;
 					} else {
-						printf("UNBLOCK SUCCESSFUL\n");
 						return UNLOCK_WRONG_PIN;
 					}		
 				}
@@ -207,17 +219,25 @@ int unlock(long card_no, char *password){
 	return UNLOCK_UNBLOCKED_RESPONSE;
 }
 
-int is_blocked(char *card_no){
+/*
+ * A common use for this function is when the user tries to login 
+ * but the given card_no is blocked
+ */
+int is_not_blocked(char *card_no){
 
 	int i = 0;
 	for (i = 0; i < blocked_cards_no; ++i){
 		if (blocked_cards[i] == atol(card_no)){
-			return UNLOCK_BLOKED;
+			return UNLOCK_BLOCKED;
 		}
 	}
 	return UNLOCK_UNBLOCKED;
 }
 
+/*
+ * Returns the command code in the define
+ * depending on the char *received as parameter
+ */
 int get_command_code(char *command)
 {
 	if (strcmp(command, "login") == 0)
@@ -236,6 +256,9 @@ int get_command_code(char *command)
 	return DEFAULT_CMD;
 }
 
+/*
+ * used to check if the command is unlock
+ */ 
 int check_if_unlock_cmd(char *command){
 	char copy[BUFLEN];
 	memset(copy, 0, BUFLEN);
@@ -247,6 +270,9 @@ int check_if_unlock_cmd(char *command){
 	return 0;
 }
 
+/*
+ * returns in the card no parameter the card which needs to be unlocked
+ */
 void get_unlock_card_no(char *command, char *card_no){
 	char copy[BUFLEN];
 	memset(copy, 0, BUFLEN);
@@ -276,7 +302,6 @@ int login(login_params_t *params, int *pos)
 					users[i]->login_attempts = 0;
 					status = SUCCESS;
 					*pos = i;
-					printf("Scanning user %s %s\n", users[i]->name, users[i]->surname);
 				} else {
 					if (users[i]->login_attempts >= 3) {
 						status = LOGIN_BRUTE_FORCE;
@@ -292,7 +317,10 @@ int login(login_params_t *params, int *pos)
 	return status;
 }
 
-int logout(int user_connection)
+/*
+ * logout a user using the fd file descriptor
+ */
+int logout(int fd)
 {
 	/*
 	 * If the user has not been authenticated
@@ -302,7 +330,7 @@ int logout(int user_connection)
 	int i = 0;
 	for (i = 0; i < user_count; ++i){
 		if (users[i] != NULL){
-			if (users[i]->fd == user_connection)
+			if (users[i]->fd == fd)
 				user = users[i];
 		}
 	}
@@ -320,6 +348,10 @@ int logout(int user_connection)
 	user->fd = -1;
 	 return LOGOUT_SUCCESSFUL;
 }
+
+/*
+ * Wrapper function for the send call for tcp socket represented by fd
+ */
 void send_client_code(int fd, int code)
 {
 	char buf[BUFLEN];
@@ -329,6 +361,9 @@ void send_client_code(int fd, int code)
 	send(fd, buf, BUFLEN, 0);
 }
 
+/*
+ * Wrapper function for the send call for udp socket represented by fd
+ */
 void send_udp_client_code(struct sockaddr *client_address, int fd, int code){
 	char buffer[BUFLEN];
 	memset(buffer, 0, BUFLEN);
@@ -338,14 +373,9 @@ void send_udp_client_code(struct sockaddr *client_address, int fd, int code){
 	return;
 }
 
-void send_client_message(int fd, char *message)
-{
-	char buf[BUFLEN];
-	memset(buf, 0, BUFLEN);
-	memcpy(buf, message, BUFLEN);
-	send(fd, buf, BUFLEN, 0);
-}
-
+/*
+ * Function for getting the user logged connected on the fd socket
+ */
 int get_user_pos_by_fd(int fd){
 	int i = 0;
 	for (i = 0; i < user_count; ++i){
@@ -356,6 +386,9 @@ int get_user_pos_by_fd(int fd){
 	return -1;
 }
 
+/*
+ * Function used when getmoney command comes in 
+ */
 int substract_from_balance(int fd, long summ){
 	/*
 	 * Get the user for the given fd
@@ -376,6 +409,9 @@ int substract_from_balance(int fd, long summ){
 	return GET_MONEY_SUCCESSFUL;
 }
 
+/*
+ * Function called when the getmoney command comes in 
+ */
 int put_summ_in_balance(int fd, long summ){
 	/*
 	 * Get the user for the given fd
@@ -390,7 +426,7 @@ int put_summ_in_balance(int fd, long summ){
 }
 
 /*
- * Get the list of users from the file
+ * Populate the list of users with information from the input file
  */
 void get_users_from_file(user_t **out)
 {
@@ -412,6 +448,9 @@ void get_users_from_file(user_t **out)
 	 * Read the users. (just the first word of each row)
 	 */
 	 for (int i = 0; i < N; ++i) {
+	 	/*
+		 * Allocate memory for all the pointers in the user_t struct
+		 */
 		fgets(line, BUFLEN, user_file);
 		out[user_count] = (user_t *)malloc(1 * sizeof(user_t));
 		out[user_count]->name = (char *)malloc(BUFLEN * sizeof(char));
@@ -436,22 +475,13 @@ void get_users_from_file(user_t **out)
 		//get the balance
 		tok = strtok(NULL, "\n\t ");
 		out[user_count]->balance = atof(tok);
-		
-
-		printf("Entering user with %s %s %ld %d %s %f\n", 
-			out[user_count]->name,
-			out[user_count]->surname,
-			out[user_count]->card_no,
-			out[user_count]->pin,
-			out[user_count]->password,
-			out[user_count]->balance
-		);
 		user_count++;
 	 }
-	 printf("Finished reading users from file user_count = %d \n", user_count);
 }
 
-
+/*
+ * Returns the number at the beginning of the users file
+ */ 
 int get_users_from_file_count()
 {
 	int N;
@@ -460,6 +490,9 @@ int get_users_from_file_count()
 	return N;
 }
 
+/*
+ * Wrapper function for creating the users
+ */ 
 void create_users()
 {
 	int N = get_users_from_file_count();
@@ -467,19 +500,9 @@ void create_users()
 	get_users_from_file(users);
 }
 
-int get_user_pos_by_name(char *name)
-{
-	int users_count = get_users_from_file_count();
-	for (int i = 0; i < users_count; ++i) {
-		if (users[i] == NULL)
-			continue;
-		if (strcmp(users[i]->name, name) == 0){
-			return i;
-		}
-	}
-	return -1;
-}
-
+/*
+ * Function for parsing the parameters after the unlock command came in
+ */
 void get_unlock_credentials(char *command, long *card_no, char *password)
 {
 	char copy[BUFLEN];
@@ -496,6 +519,9 @@ void get_unlock_credentials(char *command, long *card_no, char *password)
 	}
 }
 
+/*
+ * Sets the fd on which the user having the card_no is found
+ */
 void set_fd_for_card_no(long card_no, int fd){
 	int i = 0;
 	for (i = 0; i < user_count; ++i){
@@ -504,7 +530,9 @@ void set_fd_for_card_no(long card_no, int fd){
 		}
 	}
 }
-
+/*
+ * parses the getmoney command
+ */
 void get_summ_from_command(char *command, long *summ){
 	char copy[BUFLEN];
 	char *tok;
@@ -519,23 +547,23 @@ void get_summ_from_command(char *command, long *summ){
 	}
 }
 
+/*
+ * the heart of the program :) 
+ */ 
 int main(int argc, char ** argv)
 {
 	if (argc <= 2){
 		perror("./server <port> <user_file>");
 		exit(1);
 	}
-	
+
 	/*
 	 * Open files
 	 */
 	user_file = fopen(argv[2], "r");
 	if (user_file == NULL)
 		perror("Cannot open user_file");
-	shared_file = fopen(argv[3],"r");
-	if(shared_file == NULL)
-		perror("Cannot open shared_file");
-	
+
 	/*
 	 * Create user files
 	 */
@@ -558,8 +586,6 @@ int main(int argc, char ** argv)
 		perror("Cannot open UDP Socket");	
 		exit(1);
 	}
-		
-
 
 	/*
 	 * Setup the address and port for server to listen on
@@ -585,7 +611,6 @@ int main(int argc, char ** argv)
 	/*
 	 * Bind TCP socket to address and  port
 	 */
-
 	result = bind(server_sock, (struct sockaddr *) &server_addr_tcp, sizeof(server_addr_tcp));
 	if (result < 0) {
 		perror( "Cannot bind TCP socket to address \n");
@@ -593,23 +618,13 @@ int main(int argc, char ** argv)
 	}
 
 	/*
-	 * Bind UDP socket to address and port
-	 */
-	result = bind(unlock_sock, (struct sockaddr *) &server_addr_udp, sizeof(server_addr_udp));
-	if (result < 0){
-		perror("Cannot bind UDP Socket");
-		exit(1);
-	}
-	
-	/*
-	 * Call listen call
+	 * mandatory for TCP Sockets
 	 */
 	result = listen(server_sock, MAX_USERS);
 	if (result < 0){
 		perror("Cannot listen on socket");
 		exit(1);
 	}
-
 
 	/*
 	 * Do the select statement
@@ -625,8 +640,6 @@ int main(int argc, char ** argv)
 	FD_SET(server_sock, &original);
 	FD_SET(unlock_sock, &original);
 	FD_SET(STDIN_FILENO, &original);
-
-
 
 	/*
 	 * Create unique users list
@@ -646,11 +659,11 @@ int main(int argc, char ** argv)
 		for(i = 0; i <= fdmax; i++) {
 			if (FD_ISSET(i, &modified)) {
 				if (i == server_sock) {
-					// a venit ceva pe socketul inactiv(cel cu listen) = o noua conexiune
-					// actiunea serverului: accept()
 					int clilen = sizeof(client_addr);
 					int newsockfd;
-					if ((newsockfd = accept(server_sock, (struct sockaddr *)&client_addr,(unsigned int *) &clilen)) == -1) {
+					if ((newsockfd = accept(server_sock,
+											(struct sockaddr *)&client_addr,
+											(unsigned int *) &clilen)) == -1) {
 						perror("ERROR in accept");
 					} 
 					else {
@@ -660,13 +673,14 @@ int main(int argc, char ** argv)
 							fdmax = newsockfd;
 						}
 					}
-					printf("Noua conexiune la server \n");
 				} else if (i == unlock_sock){
-					printf("Aud ceva pe UDP \n");
 					//unlock logic
 					char buffer[BUFLEN];
 					char card_no[BUFLEN];
 					memset(buffer, 0, BUFLEN);
+					/*
+					 * Get the unlock call
+					 */
 					socklen_t addr_size = (socklen_t)sizeof(server_addr_udp);
 					result = recvfrom(unlock_sock, buffer, BUFLEN, 0,
 							 (struct sockaddr*) &client_addr_udp, &addr_size);
@@ -674,20 +688,21 @@ int main(int argc, char ** argv)
 						perror("Did not receive on UDP socket");
 						continue;
 					} 
+
 					/*
 					 * Check if command is Unlock
 					 */
 					if (check_if_unlock_cmd(buffer)){
-						printf("am primit %s\n", buffer);
 						get_unlock_card_no(buffer, card_no);
-						printf("Card no = %s\n", card_no);
+
 						/*
 						 * Check if the card_no exists
 						 */
 						if (check_unlock_card_no(card_no) == CARD_NO_EXISTS){
-							//send UNLOCK_PASS_REQEUST
-							printf("Trimit pe UDP cod de pin\n");
-							if (!is_blocked(card_no)){
+							/*
+							 * 
+							 */
+							if (is_not_blocked(card_no)){
 								printf("Card is not blocked");
 								send_udp_client_code((struct sockaddr*)&client_addr_udp,
 													unlock_sock, UNLOCK_UNBLOCKED_RESPONSE);
