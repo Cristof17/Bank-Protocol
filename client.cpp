@@ -42,6 +42,7 @@ using namespace std;
 #define GET_MONEY_NOT_MULTIPLE -9                                                  
 #define GET_MONEY_SUMM_TOO_LARGE -8 
 #define GET_MONEY_SUCCESSFUL 1231
+#define PUT_MONEY_SUCCESSFUL 1232
 
 
 #define LOGOUT_INVALID_USER -1
@@ -272,7 +273,7 @@ int main(int argc, char ** argv)
 			 * Ifock_sizeI need to read from stdin
 			 */
 			if (i == STDIN_FILENO && FD_ISSET(i, &modified)) {
-				read(STDIN_FILENO, buffer, BUFLEN);
+				fgets(buffer, BUFLEN, stdin);
 				if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
 					printf("Buffer is empty\n");
 					memset(buffer, 0 , BUFLEN);
@@ -428,10 +429,10 @@ int main(int argc, char ** argv)
 				 * I have not send any information and that
 				 * what I received from stdin was empty
 				 */
-				if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
-					memset(buffer, 0 , BUFLEN);
-					continue;
-				}
+				//if (check_buffer_empty(buffer) || (strlen(buffer) <= 1)) {
+				//	memset(buffer, 0 , BUFLEN);
+				//	continue;
+				//}
 				memset(buffer, 0, BUFLEN);
 				result = recv(sockfd, buffer, BUFLEN, 0);
 				printf("Received %d bytes\n", result);
@@ -446,7 +447,6 @@ int main(int argc, char ** argv)
 						 */
 						char message[] = "ATM> Login successful\n";
 						write_log(message);
-						memset(buffer, 0, BUFLEN);
 						logged_in = LOGGED_IN;
 						break;
 					}
@@ -459,18 +459,16 @@ int main(int argc, char ** argv)
 					}
 					case ALREADY_LOGGED_IN:
 					{
-						printf("ATM> -2 : Sesiune deja deschisa\n");
 						char message[] = "ATM> -2 : Sesiune deja deschisa\n";
+						fputs(message, stdout);
 						write_log(message);
-						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LOGOUT_INVALID_USER:
 					{
-						printf("ATM> -1 : Clientul nu e autentificat\n");
 						char message[] = "ATM> -1 : Clientul nu e autentificat\n";
+						fputs(message, stdout);
 						write_log(message);
-						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case LOGOUT_SUCCESSFUL:
@@ -485,25 +483,22 @@ int main(int argc, char ** argv)
 					case NOT_LOGGED_IN:
 					{
 						char message[] = "ATM> -11 : Utilizator inexistent";
-						printf("%s\n", message);
+						fputs(message, stdout);
 						write_log(message);
-						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case CARD_NO_INEXISTENT:
 					{
 						char message[] = "ATM> -4 : Numar card inexistent";
-						printf("%s\n", message);
 						write_log(message);
-						memset(buffer, 0, BUFLEN);
+						fputs(message, stdout);
 						break;
 					}
 					case WRONG_PIN:
 					{
 						char message[] = "ATM> -3 : Pin gresit";
-						printf("%s\n", message);
 						write_log(message);
-						memset(buffer, 0, BUFLEN);
+						fputs(message, stdout);
 						break;
 					}
 					case LISTSOLD_SUCCESSFUL:
@@ -540,6 +535,7 @@ int main(int argc, char ** argv)
 						char message[] = "ATM> -8 : Fonduri insuficiente\n";
 						write_log(message);
 						fputs(message, stdout);
+						memset(message, 0, BUFLEN);
 						break;
 					}
 					case GET_MONEY_SUCCESSFUL:
@@ -548,16 +544,25 @@ int main(int argc, char ** argv)
 						memset(message, 0, BUFLEN);
 						sprintf(message, "ATM> Suma ");
 						memset(buffer, 0, BUFLEN);
+						recv(i, buffer, BUFLEN, 0);
 						strcat(message, buffer);
 						strcat(message, " retrasa cu succes\n");
 						write_log(message);
 						fputs(message, stdout);
+						memset(message, 0, BUFLEN);
+						break;
+					}
+					case PUT_MONEY_SUCCESSFUL:
+					{
+						char message[] = "Suma depusa cu succes\n";
+						write_log(message);
+						fputs(message, stdout);
+						memset(message, 0, BUFLEN);
 						break;
 					}
 					case DEFAULT_CMD:
 					{
 						printf("Command not recognized\n");
-						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					default:
@@ -565,12 +570,12 @@ int main(int argc, char ** argv)
 				}
 			}
 
-			else {
+			else if (FD_ISSET(i, &modified)) {
 				//result = read(sockfd, buffer, BUFLEN);
 				if (result <= 0) {
 					perror("Error when client receiving\n");
 				}
-				//printf("Received %s from %d \n", buffer, i);
+				printf("Received %s from %d \n", buffer, i);
 			}
 		}
 	}
@@ -578,6 +583,5 @@ int main(int argc, char ** argv)
 	fclose(client_file);
 	close(client_file_fd);
 
-	return 0;
 }
 
