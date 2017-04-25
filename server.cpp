@@ -547,6 +547,22 @@ void get_summ_from_command(char *command, long *summ){
 }
 
 /*
+ * Wrapper function over a for loop interating through the user list
+ * and checking which user has a fd different that -1
+ */
+void send_users_quit_message(){
+	int i = 0;
+	int num_users = get_users_from_file_count();
+	if (user_count != 0){
+		for (i = 0; i < num_users; ++i){
+			if (users[i]->fd > 1){
+				send_client_code(users[i]->fd, QUIT_CMD); 
+			}
+		}
+	}
+}
+
+/*
  * the heart of the program :) 
  */ 
 int main(int argc, char ** argv)
@@ -775,7 +791,7 @@ int main(int argc, char ** argv)
 					char buffer[BUFLEN];
 					memset(buffer, 0, BUFLEN);
 					fgets(buffer, BUFLEN, stdin);
-					if (strcmp(buffer, ""))
+					if (strcmp(buffer, "") == 0)
 						continue;
 					char *tok = strtok(buffer, " \n");
 					result = get_command_code(tok);
@@ -788,6 +804,7 @@ int main(int argc, char ** argv)
 						default:
 							break;
 					}
+					memset(buffer, 0, BUFLEN);
 				}
 					
 				else {

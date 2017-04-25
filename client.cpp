@@ -25,7 +25,7 @@ using namespace std;
 /*
  * Commands
  */
-#define QUIT_CMD 10
+#define QUIT_CMD 3
 #define DEFAULT_CMD 1
 #define UPLOAD_CMD 2
 #define LOGIN_CMD 11
@@ -607,6 +607,12 @@ int main(int argc, char ** argv)
 						memset(buffer, 0, BUFLEN);
 						break;
 					}
+					case QUIT_CMD:
+					{
+						recv(i, buffer, BUFLEN, 0);
+						memset(buffer, 0, BUFLEN);
+						goto RELEASE;
+					}
 					case DEFAULT_CMD:
 					{
 						char message[] = "Command not recognized\n";
@@ -620,14 +626,12 @@ int main(int argc, char ** argv)
 				}
 			}
 
-			else {
-				if (result <= 0) {
-					perror("Error when client receiving\n");
-				}
+			else if (FD_ISSET(i, &modified)){
 			}
 		}
 	}
 
+	RELEASE:
 	fclose(client_file);
 	close(client_file_fd);
 
