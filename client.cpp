@@ -84,7 +84,10 @@ fd_set modified;
 
 char last_command[BUFLEN];
 
-
+/*                                                                                  
+* Returns the command code in the define                                           
+* depending on the char *received as parameter                                     
+*/       
 int get_command_code(char *command)
 {
 	char copy[BUFLEN];
@@ -103,6 +106,9 @@ int get_command_code(char *command)
 	return DEFAULT_CMD;
 }
 
+/*
+ * Parse function for the command argument
+ */
 void get_login_credentials(char *command, char *out_card_no, char *out_pin){
 	char copy[BUFLEN];
 	char *tok;
@@ -125,10 +131,9 @@ void get_login_credentials(char *command, char *out_card_no, char *out_pin){
 	return;
 }
 
-int get_unlock_response(char *message){
-	char copy[BUFLEN];
-}
-
+/*
+ * Wrapper for parsing the command and getting the argument
+ */
 void get_argument(char *command, char **out){
 	if (*out == NULL)
 		(*out) = (char *)malloc(BUFLEN * sizeof(char));
@@ -332,6 +337,7 @@ int main(int argc, char ** argv)
 					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
 					sendto(unlock_fd, buffer, BUFLEN, 0,
 						(struct sockaddr *)&server_addr_udp, sock_size); 
+					printf("Sending unlock commandn\n");
 					/*
 					 * get the response for the unlock command
 					 */

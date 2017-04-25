@@ -617,6 +617,12 @@ int main(int argc, char ** argv)
 		exit(1);
 	}
 
+	result = bind(unlock_sock, (struct sockaddr *)&server_addr_udp, sizeof(server_addr_udp));
+	if (result < 0) {
+		perror( "Cannot bind TCP socket to address \n");
+		exit(1);
+	}
+
 	/*
 	 * mandatory for TCP Sockets
 	 */
