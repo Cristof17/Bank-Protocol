@@ -421,6 +421,7 @@ int main(int argc, char ** argv)
 									char message[] = "UNLOCK> Client deblocat\n";
 									write_log(message);
 									fputs(message, stdout);
+									memset(buffer, 0, BUFLEN);
 									break;
 								}
 								case UNLOCK_WRONG_PIN:
@@ -428,6 +429,7 @@ int main(int argc, char ** argv)
 									char message[] = "UNLOCK> -7 : Deblocare esuata";
 									write_log(message);
 									fputs(message, stdout);
+									memset(buffer, 0, BUFLEN);
 									break;
 								}
 								case UNLOCK_ERROR:
@@ -435,6 +437,7 @@ int main(int argc, char ** argv)
 									char message[] = "UNLOCK> -6 : Operatie esuata";
 									write_log(message);
 									fputs(message, stdout);
+									memset(buffer, 0, BUFLEN);
 									break;
 								}
 							}
@@ -448,6 +451,7 @@ int main(int argc, char ** argv)
 							char message[] = "UNLOCK> -6 : Operatie esuata\n";
 							write_log(message);
 							fputs(message, stdout);
+							memset(buffer, 0, BUFLEN);
 							break;
 						}
 					}
@@ -508,6 +512,7 @@ int main(int argc, char ** argv)
 						printf("ATM> -5 : Card blocat\n");
 						char message[] = "ATM> -5 : Card blocat\n";
 						write_log(message);
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case ALREADY_LOGGED_IN:
@@ -533,6 +538,7 @@ int main(int argc, char ** argv)
 						memset(card_no, 0, BUFLEN);
 						memset(pin, 0, BUFLEN);
 						logged_in = LOGGED_OUT;
+						memset(buffer, 0, BUFLEN);
 						break;
 					}
 					case NOT_LOGGED_IN:

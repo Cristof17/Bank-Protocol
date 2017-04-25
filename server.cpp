@@ -44,6 +44,7 @@
 #define UNLOCK_INEXISTENT_CARD_NO -4
 #define UNLOCK_WRONG_PIN -7
 #define UNLOCK_REQUEST_PIN 10102
+#define UNLOCK_BLOKED_CARD 0
 #define UNLOCK_UNBLOCKED_CARD -6
 #define LISTSOLD_SUCCESSFUL 12
 #define GET_MONEY_NOT_MULTIPLE -9
@@ -200,7 +201,17 @@ int unlock(long card_no, char *password){
 			}
 		}
 	}
-	return UNLOCK_ERROR;
+	return UNLOCK_UNBLOCKED_CARD;
+}
+
+int is_blocked(long card_no){
+	int i = 0;
+	for (i = 0; i < blocked_card_no; ++i){
+		if (blocked_card[i] == card_no){
+			return UNLOCK_BLOKED_CARD;
+		}
+	}
+	return UNLOCK_UNBLOCKED_CARD;
 }
 
 int get_command_code(char *command)
@@ -709,9 +720,14 @@ int main(int argc, char ** argv)
 																UNLOCK_WRONG_PIN);
 									break;
 								}
+								case UNLOCK_UNBLOCKED_CARD:
+									send_udp_client_code((struct sockaddr *)&client_addr_udp, unlock_sockm
+																		UNLOCK_UNBLOCKED_CARD);
+									break;
 								default:
 								{
 									printf("UNLOCK default error code\n");
+									send_client_code(i, UNLOCK_ERROR);
 									break;
 								}
 							}
