@@ -430,7 +430,6 @@ int put_summ_in_balance(int fd, long summ){
  */
 void get_users_from_file(user_t **out)
 {
-	int N = 0;
 	char line[BUFLEN];
 	char *tok;
 	/*
@@ -442,8 +441,8 @@ void get_users_from_file(user_t **out)
 	 * Get the number of users allowed and
 	 * alloc an array of size <number_of_users>
 	 */
+	int N = 0;
 	fscanf(user_file, "%d\n", &N);
-	printf("read N = %d\n", N);
 	/*
 	 * Read the users. (just the first word of each row)
 	 */
@@ -711,7 +710,6 @@ int main(int argc, char ** argv)
 							 * cannot be carried out message
 							 */
 							if (is_not_blocked(card_no)){
-								printf("Card is not blocked");
 								send_udp_client_code((struct sockaddr*)&client_addr_udp,
 													unlock_sock, UNLOCK_UNBLOCKED_RESPONSE);
 								continue;
@@ -790,7 +788,6 @@ int main(int argc, char ** argv)
 						default:
 							break;
 					}
-					printf("Command %s came \n", buffer);
 				}
 					
 				else {
@@ -982,7 +979,6 @@ int main(int argc, char ** argv)
 								memset(payload, 0, BUFLEN);
 								char *tok = strtok(NULL, " \n\t");
 								sscanf(tok, "%lf\n", &summ); 
-								printf("summ from command = %lf\n", summ);
 								result = put_summ_in_balance(i, (long)summ);
 								switch (result) {
 									case NOT_LOGGED_IN:
@@ -1012,7 +1008,6 @@ int main(int argc, char ** argv)
 							}
 							default:
 							{
-								printf("%d Default command\n", DEFAULT_CMD);
 								send_client_code(i, DEFAULT_CMD);
 								break;
 							}

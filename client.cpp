@@ -336,7 +336,6 @@ int main(int argc, char ** argv)
 					socklen_t sock_size = (socklen_t) sizeof(server_addr_udp);
 					sendto(unlock_fd, buffer, BUFLEN, 0,
 						(struct sockaddr *)&server_addr_udp, sock_size); 
-					printf("Sending unlock commandn\n");
 					/*
 					 * get the response for the unlock command
 					 */
@@ -622,11 +621,9 @@ int main(int argc, char ** argv)
 			}
 
 			else {
-				//result = read(sockfd, buffer, BUFLEN);
 				if (result <= 0) {
 					perror("Error when client receiving\n");
 				}
-				//printf("Received %s from %d \n", buffer, i);
 			}
 		}
 	}
